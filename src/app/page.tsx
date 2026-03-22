@@ -1558,6 +1558,41 @@ ${wardrobeSummary}
         ) : (
           <button onClick={() => setLetgoAdding(true)} style={{ width: "100%", padding: 14, borderRadius: 14, border: "2px dashed rgba(107,45,62,0.2)", background: "rgba(107,45,62,0.03)", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500, color: "#6B2D3E" }}>+ 비울 옷 추가</button>
         )}
+
+        {(() => {
+          const candidates = available
+            .map(i => ({ item: i, count: wearData.counts[i.id] || 0, lastWorn: wearData.lastDates[i.id] }))
+            .sort((a, b) => a.count - b.count || (a.lastWorn || "0").localeCompare(b.lastWorn || "0"))
+            .slice(0, 5);
+          if (candidates.length === 0) return null;
+          return (
+            <div style={{ marginTop: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#C4952B", marginBottom: 8 }}>비울 옷 추천</div>
+              <div style={{ fontSize: 11, color: "#888", marginBottom: 10 }}>착용 빈도가 낮은 아이템이에요</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {candidates.map(({ item, count, lastWorn }) => (
+                  <div key={item.id} style={{ background: "rgba(196,149,43,0.05)", borderRadius: 12, padding: "10px 14px", border: "1px solid rgba(196,149,43,0.15)", display: "flex", alignItems: "center", gap: 10 }}>
+                    {item.image_url ? (
+                      <img src={item.image_url} alt={item.name} style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
+                    ) : item.color ? (
+                      <ColorDot color={item.color} />
+                    ) : null}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: "#2A2A2A" }}>{item.name}</div>
+                      <div style={{ fontSize: 10, color: "#C4952B" }}>
+                        {count > 0 ? `${count}회 착용 · 마지막 ${lastWorn}` : "착용 기록 없음"}
+                      </div>
+                    </div>
+                    <button onClick={async () => {
+                      await supabase.from("letgo_items").insert({ item_id: item.id, reason: "착용 빈도 낮음" });
+                      fetchData();
+                    }} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(196,149,43,0.3)", background: "transparent", color: "#C4952B", cursor: "pointer", fontSize: 11, fontFamily: "inherit", fontWeight: 500, whiteSpace: "nowrap" }}>비움에 추가</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   };
