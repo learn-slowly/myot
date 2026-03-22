@@ -61,7 +61,7 @@ export const CATEGORIES: Record<string, string> = {
   hats: "모자/캡",
   jewelry: "주얼리",
   watches: "시계",
-  scarves: "머플러/스카프",
+  scarves: "머플러/스카프/타이",
   accessories: "소품",
 };
 
