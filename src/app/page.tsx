@@ -778,10 +778,101 @@ JSON 배열만 반환:
   };
 
   // ─── CLOSET ───────────────────────────────────────────────────
+  const [showClosetStats, setShowClosetStats] = useState(false);
+
+  const renderClosetStats = () => {
+    const now = new Date();
+    const curSeason = getCurrentSeason();
+    const seasonLabel = SEASONS[curSeason];
+
+    // 시즌 시작 월 계산
+    const seasonStartMonth: Record<Season, number> = { spring: 3, summer: 6, fall: 9, winter: 12 };
+    const startMonth = seasonStartMonth[curSeason];
+    const seasonStart = new Date(startMonth === 12 && now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear(), startMonth - 1, 1);
+
+    const thisSeasonNew = allItems.filter(i => i.purchased_at && new Date(i.purchased_at) >= seasonStart);
+    const thisYearNew = allItems.filter(i => i.purchased_at && i.purchased_at.startsWith(String(now.getFullYear())));
+
+    const byAcquired: Record<string, number> = {};
+    allItems.forEach(i => {
+      const via = i.acquired_via === "new" ? "새옷 구매" : i.acquired_via === "gift" ? "선물" : i.acquired_via === "used" ? "중고구매" : "미입력";
+      byAcquired[via] = (byAcquired[via] || 0) + 1;
+    });
+
+    const allCats = { ...CATEGORIES, ...customCats };
+    const byCat: Record<string, number> = {};
+    allItems.forEach(i => { const label = allCats[i.cat] || i.cat; byCat[label] = (byCat[label] || 0) + 1; });
+    const topCats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    const needsCleaning = allItems.filter(i => {
+      if (!i.last_cleaned_at) return false;
+      const diff = (now.getTime() - new Date(i.last_cleaned_at).getTime()) / (1000 * 60 * 60 * 24);
+      return diff > 90;
+    });
+
+    const statBox = { background: "rgba(255,255,255,0.7)", borderRadius: 12, padding: "12px 16px", border: "1px solid rgba(0,0,0,0.06)" } as const;
+    const statNum = { fontSize: 22, fontWeight: 700, color: "#6B2D3E" } as const;
+    const statLabel = { fontSize: 11, color: "#888", marginTop: 2 } as const;
+
+    return (
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <div style={{ ...statBox, flex: 1, textAlign: "center" }}>
+            <div style={statNum}>{allItems.length}</div>
+            <div style={statLabel}>전체 아이템</div>
+          </div>
+          <div style={{ ...statBox, flex: 1, textAlign: "center" }}>
+            <div style={statNum}>{thisSeasonNew.length}</div>
+            <div style={statLabel}>이번 {seasonLabel} 신규</div>
+          </div>
+          <div style={{ ...statBox, flex: 1, textAlign: "center" }}>
+            <div style={statNum}>{thisYearNew.length}</div>
+            <div style={statLabel}>{now.getFullYear()}년 신규</div>
+          </div>
+        </div>
+
+        <div style={{ ...statBox, marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A", marginBottom: 8 }}>카테고리별</div>
+          {topCats.map(([cat, count]) => (
+            <div key={cat} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 12, color: "#555", flex: 1 }}>{cat}</span>
+              <div style={{ flex: 2, height: 6, borderRadius: 3, background: "rgba(0,0,0,0.06)", overflow: "hidden" }}>
+                <div style={{ width: `${(count / allItems.length) * 100}%`, height: "100%", borderRadius: 3, background: "#6B2D3E" }} />
+              </div>
+              <span style={{ fontSize: 11, color: "#888", minWidth: 24, textAlign: "right" }}>{count}</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ ...statBox, marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A", marginBottom: 6 }}>입수 경로</div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {Object.entries(byAcquired).map(([via, count]) => (
+              <span key={via} style={{ fontSize: 12, color: "#555" }}>{via} <strong style={{ color: "#6B2D3E" }}>{count}</strong></span>
+            ))}
+          </div>
+        </div>
+
+        {needsCleaning.length > 0 && (
+          <div style={{ ...statBox, borderColor: "rgba(196,149,43,0.3)" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#C4952B", marginBottom: 6 }}>세탁 필요 (90일 경과)</div>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {needsCleaning.map(i => <span key={i.id} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 16, background: "rgba(196,149,43,0.1)", color: "#C4952B" }}>{i.name}</span>)}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderCloset = () => (
     <div>
       {imageUploading && <div style={{ padding: "8px 16px", marginBottom: 12, borderRadius: 10, background: "rgba(196,149,43,0.1)", border: "1px solid rgba(196,149,43,0.2)", fontSize: 12, color: "#C4952B", textAlign: "center" }}>사진 업로드 중...</div>}
       {generatingCombos && <div style={{ padding: "8px 16px", marginBottom: 12, borderRadius: 10, background: "rgba(107,45,62,0.08)", border: "1px solid rgba(107,45,62,0.15)", fontSize: 12, color: "#6B2D3E", textAlign: "center" }}>AI가 새 아이템으로 코디 조합 만드는 중...</div>}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <button onClick={() => setShowClosetStats(!showClosetStats)} style={{ fontSize: 12, color: "#6B2D3E", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>{showClosetStats ? "통계 접기 ▲" : "옷장 통계 ▼"}</button>
+      </div>
+      {showClosetStats && renderClosetStats()}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <Pill label="전체" active={closetFilter === "all"} onClick={() => setClosetFilter("all")} />
