@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "내옷 myot",
-  description: "워크웨어 · 아이비 · 캐주얼 코디 앱",
+  description: "AI 기반 개인 스타일 옷장 관리 — My Only Trend",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
