@@ -62,7 +62,7 @@ function ColorDot({ color, size = 18 }: { color?: string; size?: number }) {
 }
 
 function ItemCard({
-  item, compact, onClick, selected, onRemove, imageUrl, onAddPhoto, onRemovePhoto, onEdit,
+  item, compact, onClick, selected, onRemove, imageUrl, onAddPhoto, onRemovePhoto, onEdit, wearCount, lastWorn,
 }: {
   item: ClothingItem; compact?: boolean; onClick?: () => void; selected?: boolean; onRemove?: () => void;
   imageUrl?: string; onAddPhoto?: () => void; onRemovePhoto?: () => void; onEdit?: () => void;
