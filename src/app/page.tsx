@@ -334,6 +334,8 @@ export default function Home() {
       id: r.id as string, cat: r.cat as CategoryKey, name: r.name as string, brand: r.brand as string | undefined,
       color: r.color as string | undefined, season: r.season as Season[] | undefined,
       tags: ((r.tags as string[]) || []) as import("@/data/closet").StyleTag[], note: r.note as string | undefined, image_url: r.image_url as string | undefined,
+      purchased_at: r.purchased_at as string | undefined, last_cleaned_at: r.last_cleaned_at as string | undefined,
+      acquired_via: r.acquired_via as string | undefined, size: r.size as string | undefined,
     })));
     if (combosRes.data) setCombos(combosRes.data as DbCombo[]);
     if (wishRes.data) setWishlist(wishRes.data.map((r: Record<string, unknown>) => ({
