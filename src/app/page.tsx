@@ -339,7 +339,7 @@ export default function Home() {
       supabase.from("clothing_items").select("*").order("id"),
       supabase.from("combos").select("*"),
       supabase.from("wish_items").select("*").order("created_at"),
-      supabase.from("ootd_logs").select("*").order("created_at", { ascending: false }),
+      supabase.from("ootd_logs").select("*").order("date", { ascending: false }),
       supabase.from("wish_statuses").select("*").order("sort_order"),
       supabase.from("letgo_items").select("*").order("created_at"),
       supabase.from("custom_categories").select("*"),
