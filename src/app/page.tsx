@@ -813,6 +813,8 @@ JSON 배열만 반환:
 
   // ─── CLOSET ───────────────────────────────────────────────────
   const [showClosetStats, setShowClosetStats] = useState(false);
+  const [styleAnalysis, setStyleAnalysis] = useState<string | null>(null);
+  const [analyzingStyle, setAnalyzingStyle] = useState(false);
   const [statsSeason, setStatsSeason] = useState<string>(() => { const s = getCurrentSeason(); const y = new Date().getFullYear(); return `${y}-${s}`; });
   const [statsYear, setStatsYear] = useState<number>(new Date().getFullYear());
 
@@ -971,6 +973,80 @@ JSON 배열만 반환:
               </div>
             )}
           </>;
+        })()}
+
+        {/* 스타일 분석 */}
+        {(() => {
+          const tagCounts: Record<string, number> = {};
+          allItems.forEach(i => i.tags.forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
+          const sorted = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]);
+          const total = Object.values(tagCounts).reduce((a, b) => a + b, 0);
+
+          return (
+            <div style={{ ...statBox, marginTop: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A", marginBottom: 8 }}>내 스타일 분석</div>
+              {sorted.length > 0 ? (
+                <>
+                  <div style={{ marginBottom: 10 }}>
+                    {sorted.map(([tag, count]) => (
+                      <div key={tag} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, color: TAG_COLORS[tag] || "#888", fontWeight: 600, minWidth: 56 }}>{tag}</span>
+                        <div style={{ flex: 1, height: 8, borderRadius: 4, background: "rgba(0,0,0,0.06)", overflow: "hidden" }}>
+                          <div style={{ width: `${(count / (sorted[0][1])) * 100}%`, height: "100%", borderRadius: 4, background: TAG_COLORS[tag] || "#888" }} />
+                        </div>
+                        <span style={{ fontSize: 11, color: "#888", minWidth: 40, textAlign: "right" }}>{Math.round((count / total) * 100)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={async () => {
+                    setAnalyzingStyle(true);
+                    try {
+                      const itemSummary = allItems.map(i => `${i.name}${i.brand ? ` [${i.brand}]` : ""}${i.color ? ` (${i.color})` : ""} — ${({ ...CATEGORIES, ...customCats })[i.cat] || i.cat}${i.tags.length ? ` #${i.tags.join(" #")}` : ""}`).join("\n");
+                      const tagSummary = sorted.map(([t, c]) => `${t}: ${c}개 (${Math.round((c / total) * 100)}%)`).join(", ");
+                      const brandCounts: Record<string, number> = {};
+                      allItems.forEach(i => { if (i.brand) brandCounts[i.brand] = (brandCounts[i.brand] || 0) + 1; });
+                      const topBrands = Object.entries(brandCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([b, c]) => `${b}(${c})`).join(", ");
+                      const colorCounts: Record<string, number> = {};
+                      allItems.forEach(i => { if (i.color) colorCounts[i.color] = (colorCounts[i.color] || 0) + 1; });
+                      const topColors = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([c, n]) => `${c}(${n})`).join(", ");
+
+                      const res = await fetch("/api/analyze-text", {
+                        method: "POST", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ prompt: `옷장 아이템 ${allItems.length}개를 분석해서 이 사람의 패션 스타일을 진단해줘.
+
+스타일 태그 분포: ${tagSummary}
+주요 브랜드: ${topBrands || "없음"}
+주요 색상: ${topColors || "없음"}
+
+전체 아이템:
+${itemSummary}
+
+다음 형식으로 한국어 답변해줘:
+1. 메인 스타일 (1-2개, 예: 워크웨어 캐주얼)
+2. 스타일 성향 요약 (2-3문장)
+3. 옷장의 강점과 보완할 점 (각 1-2줄)
+4. 추천 아이템 (2-3개, 현재 옷장에 없는 것)
+
+답변만 써줘.` }),
+                      });
+                      if (res.ok) {
+                        const data = await res.json();
+                        setStyleAnalysis(data.content?.map((c: { text?: string }) => c.text || "").join("") || "분석 실패");
+                      }
+                    } catch { setStyleAnalysis("분석 중 오류 발생"); }
+                    setAnalyzingStyle(false);
+                  }} disabled={analyzingStyle} style={{ width: "100%", padding: 10, borderRadius: 8, border: "1.5px dashed rgba(107,45,62,0.2)", background: analyzingStyle ? "rgba(107,45,62,0.08)" : "rgba(107,45,62,0.03)", cursor: analyzingStyle ? "default" : "pointer", fontSize: 12, fontFamily: "inherit", color: "#6B2D3E", fontWeight: 500 }}>
+                    {analyzingStyle ? "AI 분석 중..." : "AI로 내 스타일 분석하기"}
+                  </button>
+                  {styleAnalysis && (
+                    <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: "rgba(107,45,62,0.04)", border: "1px solid rgba(107,45,62,0.1)", fontSize: 12, color: "#555", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{styleAnalysis}</div>
+                  )}
+                </>
+              ) : (
+                <div style={{ fontSize: 12, color: "#888" }}>아이템에 스타일 태그를 추가하면 분석할 수 있어</div>
+              )}
+            </div>
+          );
         })()}
       </div>
     );

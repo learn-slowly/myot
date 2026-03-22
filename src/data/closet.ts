@@ -1,7 +1,7 @@
 // ─── TYPES ───────────────────────────────────────────────────────────
 export type Season = "spring" | "summer" | "fall" | "winter";
 export type Mood = "casual" | "neat" | "cool" | "formal";
-export type StyleTag = "워크웨어" | "아이비" | "프레피" | "힙합" | "캐주얼" | "공식" | "아웃도어" | "특수" | "데일리";
+export type StyleTag = "워크웨어" | "아이비" | "프레피" | "힙합" | "캐주얼" | "공식" | "아웃도어" | "특수" | "데일리" | "스포츠" | "클래식" | "미니멀" | "스트릿" | "아메카지" | "밀리터리" | "고프코어";
 
 export type CategoryKey = string;
 
@@ -95,6 +95,13 @@ export const TAG_COLORS: Record<string, string> = {
   "아웃도어": "#4A7C59",
   "특수": "#8E8E8E",
   "데일리": "#C4952B",
+  "스포츠": "#E85D5D",
+  "클래식": "#4A4A6A",
+  "미니멀": "#999",
+  "스트릿": "#D4652B",
+  "아메카지": "#8B6B3E",
+  "밀리터리": "#556B2F",
+  "고프코어": "#7B8B6F",
 };
 
 // ─── COLOR MAP ──────────────────────────────────────────────────────
