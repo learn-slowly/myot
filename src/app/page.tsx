@@ -587,6 +587,7 @@ JSON 배열만 반환:
 
   const [ootdSaving, setOotdSaving] = useState(false);
   const [ootdMemo, setOotdMemo] = useState("");
+  const [ootdDate, setOotdDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
   const [editingMemoText, setEditingMemoText] = useState("");
 
@@ -618,12 +619,12 @@ JSON 배열만 반환:
         })(),
       ]);
       const text = commentRes.content?.map((c: { text?: string }) => c.text || "").join("") || ootdResult.description;
-      await supabase.from("ootd_logs").insert({ date: new Date().toISOString().split("T")[0], items: ootdResult.items, description: text, image_url: imageUrl, memo: ootdMemo.trim() || null });
-      setOotdImage(null); setOotdResult(null); setOotdMemo(""); setOotdStatsView(true);
+      await supabase.from("ootd_logs").insert({ date: ootdDate, items: ootdResult.items, description: text, image_url: imageUrl, memo: ootdMemo.trim() || null });
+      setOotdImage(null); setOotdResult(null); setOotdMemo(""); setOotdDate(new Date().toISOString().split("T")[0]); setOotdStatsView(true);
       fetchData();
     } catch {
-      await supabase.from("ootd_logs").insert({ date: new Date().toISOString().split("T")[0], items: ootdResult.items, description: ootdResult.description, memo: ootdMemo.trim() || null });
-      setOotdImage(null); setOotdResult(null); setOotdMemo(""); setOotdStatsView(true);
+      await supabase.from("ootd_logs").insert({ date: ootdDate, items: ootdResult.items, description: ootdResult.description, memo: ootdMemo.trim() || null });
+      setOotdImage(null); setOotdResult(null); setOotdMemo(""); setOotdDate(new Date().toISOString().split("T")[0]); setOotdStatsView(true);
       fetchData();
     }
     setOotdSaving(false);
@@ -799,9 +800,12 @@ JSON 배열만 반환:
               ) : (
                 <button onClick={() => setOotdAddPicker(true)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1.5px dashed rgba(0,0,0,0.12)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888", marginBottom: 12 }}>+ 아이템 추가/수정</button>
               )}
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <input type="date" value={ootdDate} onChange={e => setOotdDate(e.target.value)} style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 12, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", boxSizing: "border-box" }} />
+              </div>
               <textarea value={ootdMemo} onChange={e => setOotdMemo(e.target.value)} placeholder="메모 (선택) — 어디 가는 길, 느낀 점 등" rows={2} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 12, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", marginBottom: 10, boxSizing: "border-box", resize: "vertical" }} />
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => { setOotdImage(null); setOotdResult(null); setOotdAddPicker(false); setOotdMemo(""); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888" }}>취소</button>
+                <button onClick={() => { setOotdImage(null); setOotdResult(null); setOotdAddPicker(false); setOotdMemo(""); setOotdDate(new Date().toISOString().split("T")[0]); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888" }}>취소</button>
                 <button onClick={saveOotdRecord} disabled={ootdSaving || ootdResult.items.length === 0} style={{ flex: 2, padding: 10, borderRadius: 10, border: "none", background: ootdSaving ? "#B0A090" : "#6B2D3E", color: "#fff", cursor: ootdSaving ? "default" : "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>{ootdSaving ? "AI 코멘트 생성 중..." : "오늘 착장 저장하기"}</button>
               </div>
             </div>
