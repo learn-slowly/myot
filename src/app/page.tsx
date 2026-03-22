@@ -36,6 +36,7 @@ interface OotdLog {
   date: string;
   items: string[];
   description: string;
+  imageUrl?: string;
 }
 
 interface SavedCombo {
@@ -59,9 +60,10 @@ function ColorDot({ color, size = 18 }: { color?: string; size?: number }) {
 }
 
 function ItemCard({
-  item, compact, onClick, selected, onRemove,
+  item, compact, onClick, selected, onRemove, imageUrl, onAddPhoto, onRemovePhoto,
 }: {
   item: ClothingItem; compact?: boolean; onClick?: () => void; selected?: boolean; onRemove?: () => void;
+  imageUrl?: string; onAddPhoto?: () => void; onRemovePhoto?: () => void;
 }) {
   return (
     <button
@@ -76,7 +78,11 @@ function ItemCard({
         transition: "all 0.2s", fontFamily: "inherit",
       }}
     >
-      {item.color && <ColorDot color={item.color} />}
+      {imageUrl ? (
+        <img src={imageUrl} alt={item.name} style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+      ) : item.color ? (
+        <ColorDot color={item.color} />
+      ) : null}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: compact ? 13 : 14, fontWeight: 500, color: "#2A2A2A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {item.name}
@@ -88,7 +94,15 @@ function ItemCard({
       {onRemove && (
         <span onClick={(e) => { e.stopPropagation(); onRemove(); }} style={{ color: "#CCC", fontSize: 14, cursor: "pointer", padding: "0 4px" }}>✕</span>
       )}
-      {item.tags.length > 0 && !compact && !onRemove && (
+      {onAddPhoto && !compact && (
+        <span onClick={(e) => { e.stopPropagation(); onAddPhoto(); }} style={{ color: imageUrl ? "#C4952B" : "#CCC", fontSize: 14, cursor: "pointer", padding: "0 4px", flexShrink: 0 }} title={imageUrl ? "사진 변경" : "사진 추가"}>
+          {imageUrl ? "📷" : "📷"}
+        </span>
+      )}
+      {onRemovePhoto && imageUrl && !compact && (
+        <span onClick={(e) => { e.stopPropagation(); onRemovePhoto(); }} style={{ color: "#CCC", fontSize: 12, cursor: "pointer", padding: "0 2px", flexShrink: 0 }} title="사진 삭제">✕</span>
+      )}
+      {item.tags.length > 0 && !compact && !onRemove && !onAddPhoto && (
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {item.tags.slice(0, 2).map((t) => (
             <span key={t} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: TAG_COLORS[t] || "#B0A090", color: "#fff", fontWeight: 500 }}>{t}</span>
@@ -134,8 +148,40 @@ export default function Home() {
   const [savedCombos, setSavedCombos] = useLocalStorage<SavedCombo[]>("lego-saved-combos", []);
   const [wishlist, setWishlist] = useLocalStorage<WishItem[]>("lego-wishlist", WISHLIST_DEFAULT);
   const [ootdLogs, setOotdLogs] = useLocalStorage<OotdLog[]>("lego-ootd-logs", []);
+  const [itemImages, setItemImages] = useLocalStorage<Record<string, string>>("myot-item-images", {});
+  const itemImageInputRef = useRef<HTMLInputElement>(null);
+  const [imageTargetId, setImageTargetId] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
 
   const activeSeason = selectedSeason || getCurrentSeason();
+
+  // ─── Item Image Upload (Cloudinary) ─────────────────────────────
+  const handleItemImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !imageTargetId) return;
+    setImageUploading(true);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setItemImages({ ...itemImages, [imageTargetId]: data.url });
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert("사진 업로드에 실패했어요. 다시 시도해주세요.");
+    }
+    setImageTargetId(null);
+    setImageUploading(false);
+    e.target.value = "";
+  };
 
   // ─── OOTD: Upload & Analyze ───────────────────────────────────
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,28 +196,42 @@ export default function Home() {
     reader.readAsDataURL(file);
   };
 
+  const resizeImage = (dataUrl: string, maxSize: number): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let w = img.width, h = img.height;
+        if (w > maxSize || h > maxSize) {
+          if (w > h) { h = (h / w) * maxSize; w = maxSize; } else { w = (w / h) * maxSize; h = maxSize; }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.7));
+      };
+      img.src = dataUrl;
+    });
+  };
+
   const analyzeOotd = async () => {
     if (!ootdImage) return;
     setOotdAnalyzing(true);
     try {
-      const base64 = ootdImage.split(",")[1];
-      const mediaType = ootdImage.split(";")[0].split(":")[1];
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const resized = await resizeImage(ootdImage, 1024);
+      const base64 = resized.split(",")[1];
+      const mediaType = "image/jpeg";
+      const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
-              { type: "text", text: buildAnalysisPrompt() }
-            ]
-          }]
-        })
+          image: base64,
+          mediaType,
+          prompt: buildAnalysisPrompt(),
+        }),
       });
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "API error");
       const text = data.content?.map((c: { text?: string }) => c.text || "").join("") || "";
       const clean = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean);
@@ -179,23 +239,76 @@ export default function Home() {
       setOotdResult({ items: validItems, description: parsed.description || "" });
     } catch (err) {
       console.error("Analysis error:", err);
-      setOotdResult({ items: [], description: "분석에 실패했어. 직접 아이템을 선택해줘!" });
+      const msg = err instanceof Error ? err.message : String(err);
+      setOotdResult({ items: [], description: `분석에 실패했어: ${msg}` });
     }
     setOotdAnalyzing(false);
   };
 
-  const saveOotdRecord = () => {
-    if (!ootdResult) return;
-    const record: OotdLog = {
-      id: `ootd-${Date.now()}`,
-      date: new Date().toISOString().split("T")[0],
-      items: ootdResult.items,
-      description: ootdResult.description,
-    };
-    setOotdLogs([record, ...ootdLogs]);
-    setOotdImage(null);
-    setOotdResult(null);
-    setOotdStatsView(true);
+  const [ootdSaving, setOotdSaving] = useState(false);
+
+  const uploadOotdImage = async (): Promise<string | undefined> => {
+    if (!ootdImage) return undefined;
+    try {
+      const resized = await resizeImage(ootdImage, 800);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: resized }),
+      });
+      const data = await res.json();
+      if (res.ok) return data.url;
+    } catch {}
+    return undefined;
+  };
+
+  const saveOotdRecord = async () => {
+    if (!ootdResult || ootdResult.items.length === 0) return;
+    setOotdSaving(true);
+    try {
+      const [imageUrl, commentRes] = await Promise.all([
+        uploadOotdImage(),
+        (async () => {
+          const itemNames = ootdResult.items.map(id => {
+            const item = getItem(id);
+            return item ? `${item.name}${item.color ? ` (${item.color})` : ""} — ${CATEGORIES[item.cat]}` : id;
+          });
+          const res = await fetch("/api/analyze-text", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: `오늘 착장 아이템 목록:\n${itemNames.join("\n")}\n\n이 조합에 대해 한국어로 2문장 이내로 코디 코멘트를 해줘. 스타일 느낌, 잘 어울리는 포인트, 또는 개선 팁을 짧게. 답변만 써줘.`,
+            }),
+          });
+          if (!res.ok) throw new Error();
+          return res.json();
+        })(),
+      ]);
+      const text = commentRes.content?.map((c: { text?: string }) => c.text || "").join("") || ootdResult.description;
+      const record: OotdLog = {
+        id: `ootd-${Date.now()}`,
+        date: new Date().toISOString().split("T")[0],
+        items: ootdResult.items,
+        description: text,
+        imageUrl,
+      };
+      setOotdLogs([record, ...ootdLogs]);
+      setOotdImage(null);
+      setOotdResult(null);
+      setOotdStatsView(true);
+    } catch {
+      const record: OotdLog = {
+        id: `ootd-${Date.now()}`,
+        date: new Date().toISOString().split("T")[0],
+        items: ootdResult.items,
+        description: ootdResult.description,
+      };
+      setOotdLogs([record, ...ootdLogs]);
+      setOotdImage(null);
+      setOotdResult(null);
+      setOotdStatsView(true);
+    }
+    setOotdSaving(false);
   };
 
   const getWearStats = () => {
@@ -254,12 +367,17 @@ export default function Home() {
 
           <div style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A", marginBottom: 8 }}>최근 기록</div>
           {ootdLogs.slice(0, 10).map((log, idx) => (
-            <div key={idx} style={{ background: "rgba(255,255,255,0.7)", borderRadius: 12, padding: "12px 16px", marginBottom: 6, border: "1px solid rgba(0,0,0,0.06)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <div key={idx} style={{ background: "rgba(255,255,255,0.7)", borderRadius: 12, padding: "12px 16px", marginBottom: 8, border: "1px solid rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: "#6B2D3E" }}>{log.date}</span>
                 <button onClick={() => setOotdLogs(ootdLogs.filter((_, i) => i !== idx))} style={{ border: "none", background: "transparent", color: "#CCC", cursor: "pointer", fontSize: 14 }}>✕</button>
               </div>
-              <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>{log.description}</div>
+              {log.imageUrl && (
+                <div style={{ borderRadius: 10, overflow: "hidden", marginBottom: 8 }}>
+                  <img src={log.imageUrl} alt={`OOTD ${log.date}`} style={{ width: "100%", maxHeight: 280, objectFit: "cover", display: "block" }} />
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: "#555", marginBottom: 6, lineHeight: 1.5 }}>{log.description}</div>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {log.items.map(id => { const item = getItem(id); if (!item) return null; return <span key={id} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 16, background: "rgba(0,0,0,0.06)", color: "#555" }}>{item.name}</span>; })}
               </div>
@@ -331,7 +449,7 @@ export default function Home() {
 
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => { setOotdImage(null); setOotdResult(null); setOotdAddPicker(false); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888" }}>취소</button>
-                <button onClick={saveOotdRecord} style={{ flex: 2, padding: 10, borderRadius: 10, border: "none", background: "#6B2D3E", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>오늘 착장 저장하기</button>
+                <button onClick={saveOotdRecord} disabled={ootdSaving || ootdResult.items.length === 0} style={{ flex: 2, padding: 10, borderRadius: 10, border: "none", background: ootdSaving ? "#B0A090" : "#6B2D3E", color: "#fff", cursor: ootdSaving ? "default" : "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>{ootdSaving ? "AI 코멘트 생성 중..." : "오늘 착장 저장하기"}</button>
               </div>
             </div>
           </div>
@@ -343,6 +461,7 @@ export default function Home() {
   // ─── CLOSET ───────────────────────────────────────────────────
   const renderCloset = () => (
     <div>
+      {imageUploading && <div style={{ padding: "8px 16px", marginBottom: 12, borderRadius: 10, background: "rgba(196,149,43,0.1)", border: "1px solid rgba(196,149,43,0.2)", fontSize: 12, color: "#C4952B", textAlign: "center" }}>사진 업로드 중...</div>}
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         <Pill label="전체" active={closetFilter === "all"} onClick={() => setClosetFilter("all")} />
         {Object.entries(SEASONS).map(([k, v]) => <Pill key={k} label={v} active={closetFilter === k} onClick={() => setClosetFilter(k as Season)} count={ITEMS.filter(i => i.season?.includes(k as Season)).length} />)}
@@ -359,7 +478,7 @@ export default function Home() {
                 <span style={{ fontSize: 14, fontWeight: 600, color: "#2A2A2A" }}>{CATEGORIES[ck]}</span>
                 <span style={{ fontSize: 12, color: "#888" }}>{items.length}개 {isOpen ? "▲" : "▼"}</span>
               </button>
-              {isOpen && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>{items.map(i => <ItemCard key={i.id} item={i} />)}</div>}
+              {isOpen && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>{items.map(i => <ItemCard key={i.id} item={i} imageUrl={itemImages[i.id]} onAddPhoto={() => { setImageTargetId(i.id); itemImageInputRef.current?.click(); }} onRemovePhoto={() => { const next = { ...itemImages }; delete next[i.id]; setItemImages(next); }} />)}</div>}
             </div>
           );
         })}
@@ -487,6 +606,7 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: "100vh", maxWidth: 480, margin: "0 auto" }}>
+      <input ref={itemImageInputRef} type="file" accept="image/*" onChange={handleItemImageUpload} style={{ display: "none" }} />
       <div style={{ padding: "24px 20px 16px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.5px", color: "#2A2A2A" }}>내옷 myot</h1>
         <p style={{ fontSize: 11, color: "#999", margin: "4px 0 0", letterSpacing: "2px", textTransform: "uppercase" }}>workwear · ivy · casual</p>
