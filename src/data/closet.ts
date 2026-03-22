@@ -53,6 +53,10 @@ export const CATEGORIES: Record<string, string> = {
   outerWinter: "아우터 · 겨울",
   outerSpringFall: "아우터 · 봄가을",
   outerSummer: "아우터 · 여름",
+  dresses: "원피스/드레스",
+  skirts: "스커트",
+  blouses: "블라우스",
+  bags: "가방",
   shoes: "신발",
   accessories: "소품",
 };
