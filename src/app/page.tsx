@@ -270,6 +270,7 @@ export default function Home() {
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const [closetFilter, setClosetFilter] = useState<"all" | Season>("all");
   const [expandedCat, setExpandedCat] = useState<CategoryKey | null>(null);
+  const [closetViewMode, setClosetViewMode] = useState<"category" | "date">("category");
   const [newWish, setNewWish] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -781,28 +782,62 @@ JSON 배열만 반환:
     <div>
       {imageUploading && <div style={{ padding: "8px 16px", marginBottom: 12, borderRadius: 10, background: "rgba(196,149,43,0.1)", border: "1px solid rgba(196,149,43,0.2)", fontSize: 12, color: "#C4952B", textAlign: "center" }}>사진 업로드 중...</div>}
       {generatingCombos && <div style={{ padding: "8px 16px", marginBottom: 12, borderRadius: 10, background: "rgba(107,45,62,0.08)", border: "1px solid rgba(107,45,62,0.15)", fontSize: 12, color: "#6B2D3E", textAlign: "center" }}>AI가 새 아이템으로 코디 조합 만드는 중...</div>}
-      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
-        <Pill label="전체" active={closetFilter === "all"} onClick={() => setClosetFilter("all")} />
-        {Object.entries(SEASONS).map(([k, v]) => <Pill key={k} label={v} active={closetFilter === k} onClick={() => setClosetFilter(k as Season)} count={allItems.filter(i => i.season?.includes(k as Season)).length} />)}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <Pill label="전체" active={closetFilter === "all"} onClick={() => setClosetFilter("all")} />
+          {Object.entries(SEASONS).map(([k, v]) => <Pill key={k} label={v} active={closetFilter === k} onClick={() => setClosetFilter(k as Season)} count={allItems.filter(i => i.season?.includes(k as Season)).length} />)}
+        </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button onClick={() => setClosetViewMode("category")} style={{ padding: "4px 10px", borderRadius: 6, border: "none", fontSize: 11, fontFamily: "inherit", cursor: "pointer", background: closetViewMode === "category" ? "#2A2A2A" : "rgba(0,0,0,0.06)", color: closetViewMode === "category" ? "#F5F0E1" : "#888", fontWeight: 500 }}>종류</button>
+          <button onClick={() => setClosetViewMode("date")} style={{ padding: "4px 10px", borderRadius: 6, border: "none", fontSize: 11, fontFamily: "inherit", cursor: "pointer", background: closetViewMode === "date" ? "#2A2A2A" : "rgba(0,0,0,0.06)", color: closetViewMode === "date" ? "#F5F0E1" : "#888", fontWeight: 500 }}>입고순</button>
+        </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {Object.entries({ ...CATEGORIES, ...customCats }).map(([ck, catLabel]) => {
-          let items = allItems.filter(i => i.cat === ck);
-          if (closetFilter !== "all") items = items.filter(i => !i.season || i.season.includes(closetFilter));
-          if (!items.length) return null;
-          const isOpen = expandedCat === ck;
-          return (
-            <div key={ck} style={{ background: "rgba(255,255,255,0.5)", borderRadius: 14, border: "1px solid rgba(0,0,0,0.06)", overflow: "hidden" }}>
-              <button onClick={() => setExpandedCat(isOpen ? null : ck)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "14px 18px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#2A2A2A" }}>{catLabel}</span>
-                <span style={{ fontSize: 12, color: "#888" }}>{items.length}개 {isOpen ? "▲" : "▼"}</span>
-              </button>
-              {isOpen && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
-                {items.map(i => <ItemCard key={i.id} item={i} imageUrl={i.image_url} onEdit={() => setEditingItem(i)} onAddPhoto={() => { setImageTargetId(i.id); itemImageInputRef.current?.click(); }} onRemovePhoto={() => { supabase.from("clothing_items").update({ image_url: null }).eq("id", i.id).then(() => fetchData()); }} />)}
-              </div>}
-            </div>
-          );
-        })}
+        {closetViewMode === "category" ? (
+          Object.entries({ ...CATEGORIES, ...customCats }).map(([ck, catLabel]) => {
+            let items = allItems.filter(i => i.cat === ck);
+            if (closetFilter !== "all") items = items.filter(i => !i.season || i.season.includes(closetFilter));
+            if (!items.length) return null;
+            const isOpen = expandedCat === ck;
+            return (
+              <div key={ck} style={{ background: "rgba(255,255,255,0.5)", borderRadius: 14, border: "1px solid rgba(0,0,0,0.06)", overflow: "hidden" }}>
+                <button onClick={() => setExpandedCat(isOpen ? null : ck)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "14px 18px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "#2A2A2A" }}>{catLabel}</span>
+                  <span style={{ fontSize: 12, color: "#888" }}>{items.length}개 {isOpen ? "▲" : "▼"}</span>
+                </button>
+                {isOpen && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {items.map(i => <ItemCard key={i.id} item={i} imageUrl={i.image_url} onEdit={() => setEditingItem(i)} onAddPhoto={() => { setImageTargetId(i.id); itemImageInputRef.current?.click(); }} onRemovePhoto={() => { supabase.from("clothing_items").update({ image_url: null }).eq("id", i.id).then(() => fetchData()); }} />)}
+                </div>}
+              </div>
+            );
+          })
+        ) : (() => {
+          let filtered = [...allItems];
+          if (closetFilter !== "all") filtered = filtered.filter(i => !i.season || i.season.includes(closetFilter));
+          const grouped: Record<string, ClothingItem[]> = {};
+          filtered.forEach(i => {
+            const key = i.purchased_at ? i.purchased_at.slice(0, 7) : "미입력";
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(i);
+          });
+          const sortedKeys = Object.keys(grouped).sort((a, b) => a === "미입력" ? 1 : b === "미입력" ? -1 : b.localeCompare(a));
+          return sortedKeys.map(key => {
+            const items = grouped[key];
+            const label = key === "미입력" ? "날짜 미입력" : `${key.replace("-", "년 ")}월`;
+            const isOpen = expandedCat === key;
+            return (
+              <div key={key} style={{ background: "rgba(255,255,255,0.5)", borderRadius: 14, border: "1px solid rgba(0,0,0,0.06)", overflow: "hidden" }}>
+                <button onClick={() => setExpandedCat(isOpen ? null : key)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "14px 18px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "#2A2A2A" }}>{label}</span>
+                  <span style={{ fontSize: 12, color: "#888" }}>{items.length}개 {isOpen ? "▲" : "▼"}</span>
+                </button>
+                {isOpen && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {items.sort((a, b) => (b.purchased_at || "").localeCompare(a.purchased_at || "")).map(i => <ItemCard key={i.id} item={i} imageUrl={i.image_url} onEdit={() => setEditingItem(i)} onAddPhoto={() => { setImageTargetId(i.id); itemImageInputRef.current?.click(); }} onRemovePhoto={() => { supabase.from("clothing_items").update({ image_url: null }).eq("id", i.id).then(() => fetchData()); }} />)}
+                </div>}
+              </div>
+            );
+          });
+        })()}
       </div>
       <button onClick={() => setAddingItem(true)} style={{ width: "100%", marginTop: 16, padding: 14, borderRadius: 14, border: "2px dashed rgba(107,45,62,0.2)", background: "rgba(107,45,62,0.03)", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500, color: "#6B2D3E" }}>+ 새 아이템 추가</button>
     </div>
