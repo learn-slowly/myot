@@ -285,7 +285,14 @@ export default function Home() {
   const [weatherLoading, setWeatherLoading] = useState(false);
 
   // 비움 state
-  const [letgoItems, setLetgoItems] = useState<{ dbId: string; id: string; reason?: string; addedAt: string }[]>([]);
+  const LETGO_STATUSES: Record<string, { label: string; color: string }> = {
+    undecided: { label: "미정", color: "#888" },
+    decided: { label: "나눔 결정", color: "#C4952B" },
+    giving: { label: "나눔 완료", color: "#4CAF50" },
+    sold: { label: "판매 완료", color: "#6B2D3E" },
+    disposed: { label: "정리 완료", color: "#555" },
+  };
+  const [letgoItems, setLetgoItems] = useState<{ dbId: string; id: string; reason?: string; addedAt: string; status: string }[]>([]);
   const [letgoAdding, setLetgoAdding] = useState(false);
   const [letgoSearch, setLetgoSearch] = useState("");
 
@@ -356,7 +363,7 @@ export default function Home() {
     })));
     if (statusRes.data) setWishStatuses(statusRes.data as { id: string; label: string; color: string }[]);
     if (letgoRes.data) setLetgoItems(letgoRes.data.map((r: Record<string, unknown>) => ({
-      dbId: r.id as string, id: r.item_id as string, reason: (r.reason as string) || undefined, addedAt: (r.added_at as string) || "",
+      dbId: r.id as string, id: r.item_id as string, reason: (r.reason as string) || undefined, addedAt: (r.added_at as string) || "", status: (r.status as string) || "undecided",
     })));
     if (customCatsRes.data) {
       const cats: Record<string, string> = {};
@@ -1408,35 +1415,50 @@ ${wardrobeSummary}
           </div>
         )}
 
-        {letgoItems.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A", marginBottom: 8 }}>나눔/정리할 옷 ({letgoItems.length})</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {letgoItems.map(l => {
-                const item = allItems.find(i => i.id === l.id);
-                if (!item) return null;
-                return (
-                  <div key={l.id} style={{ background: "rgba(255,255,255,0.7)", borderRadius: 12, padding: "10px 14px", border: "1px solid rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: 10 }}>
-                    {item.image_url ? (
-                      <img src={item.image_url} alt={item.name} style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
-                    ) : item.color ? (
-                      <ColorDot color={item.color} />
-                    ) : null}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: "#2A2A2A" }}>{item.name}</div>
-                      <div style={{ fontSize: 11, color: "#888" }}>
-                        {item.brand && `${item.brand} · `}
-                        {l.reason || ""}
-                        {wearData.counts[l.id] ? ` · ${wearData.counts[l.id]}회 착용` : " · 착용 기록 없음"}
+        {letgoItems.length > 0 && Object.entries(LETGO_STATUSES).map(([statusKey, { label, color }]) => {
+          const items = letgoItems.filter(l => l.status === statusKey);
+          if (!items.length) return null;
+          return (
+            <div key={statusKey} style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 4, background: color, display: "inline-block" }} />
+                {label} ({items.length})
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {items.map(l => {
+                  const item = allItems.find(i => i.id === l.id);
+                  if (!item) return null;
+                  return (
+                    <div key={l.dbId} style={{ background: "rgba(255,255,255,0.7)", borderRadius: 12, padding: "10px 14px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.name} style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
+                        ) : item.color ? (
+                          <ColorDot color={item.color} />
+                        ) : null}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: "#2A2A2A" }}>{item.name}</div>
+                          <div style={{ fontSize: 11, color: "#888" }}>
+                            {item.brand && `${item.brand} · `}
+                            {l.reason || ""}
+                            {wearData.counts[l.id] ? ` · ${wearData.counts[l.id]}회 착용` : " · 착용 기록 없음"}
+                          </div>
+                        </div>
+                        <button onClick={async () => { await supabase.from("letgo_items").delete().eq("id", l.dbId); fetchData(); }} style={{ border: "none", background: "transparent", color: "#CCC", cursor: "pointer", fontSize: 14, padding: "0 4px" }}>✕</button>
+                      </div>
+                      <div style={{ marginTop: 8, display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {Object.entries(LETGO_STATUSES).map(([sk, sv]) => (
+                          <button key={sk} onClick={async () => { if (sk !== l.status) { await supabase.from("letgo_items").update({ status: sk }).eq("id", l.dbId); fetchData(); } }}
+                            style={{ padding: "3px 8px", borderRadius: 12, border: "none", fontSize: 10, fontFamily: "inherit", cursor: "pointer", fontWeight: l.status === sk ? 600 : 400, background: l.status === sk ? sv.color : "rgba(0,0,0,0.04)", color: l.status === sk ? "#fff" : "#888" }}>{sv.label}</button>
+                        ))}
                       </div>
                     </div>
-                    <button onClick={async () => { await supabase.from("letgo_items").delete().eq("id", l.dbId); fetchData(); }} style={{ border: "none", background: "transparent", color: "#CCC", cursor: "pointer", fontSize: 14, padding: "0 4px" }}>✕</button>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })}
 
         {letgoAdding ? (
           <div style={{ marginBottom: 16 }}>
