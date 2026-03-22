@@ -7,7 +7,7 @@ import {
   getColor,
   type Season, type Mood, type CategoryKey, type ClothingItem, type WishItem,
 } from "@/data/closet";
-import { useLocalStorage } from "@/data/useLocalStorage";
+
 import { supabase } from "@/lib/supabase";
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -306,7 +306,7 @@ export default function Home() {
   const [wishStatuses, setWishStatuses] = useState<{ id: string; label: string; color: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [customCats, setCustomCats] = useLocalStorage<Record<string, string>>("myot-custom-cats", {});
+  const [customCats, setCustomCats] = useState<Record<string, string>>({});
 
   // 살/말 state
   const [buyImage, setBuyImage] = useState<string | null>(null);
@@ -315,7 +315,7 @@ export default function Home() {
   const buyFileRef = useRef<HTMLInputElement>(null);
 
   // Local state
-  const [savedCombos, setSavedCombos] = useLocalStorage<SavedCombo[]>("lego-saved-combos", []);
+  const [savedCombos, setSavedCombos] = useState<SavedCombo[]>([]);
   const [editingItem, setEditingItem] = useState<ClothingItem | null>(null);
   const [addingItem, setAddingItem] = useState(false);
   const itemImageInputRef = useRef<HTMLInputElement>(null);
@@ -328,13 +328,15 @@ export default function Home() {
 
   // ─── Fetch data from Supabase ──────────────────────────────────
   const fetchData = useCallback(async () => {
-    const [itemsRes, combosRes, wishRes, ootdRes, statusRes, letgoRes] = await Promise.all([
+    const [itemsRes, combosRes, wishRes, ootdRes, statusRes, letgoRes, customCatsRes, savedCombosRes] = await Promise.all([
       supabase.from("clothing_items").select("*").order("id"),
       supabase.from("combos").select("*"),
       supabase.from("wish_items").select("*").order("created_at"),
       supabase.from("ootd_logs").select("*").order("created_at", { ascending: false }),
       supabase.from("wish_statuses").select("*").order("sort_order"),
       supabase.from("letgo_items").select("*").order("created_at"),
+      supabase.from("custom_categories").select("*"),
+      supabase.from("saved_combos").select("*").order("saved_at"),
     ]);
     if (itemsRes.data) setAllItems(itemsRes.data.map((r: Record<string, unknown>) => ({
       id: r.id as string, cat: r.cat as CategoryKey, name: r.name as string, brand: r.brand as string | undefined,
@@ -355,6 +357,14 @@ export default function Home() {
     if (statusRes.data) setWishStatuses(statusRes.data as { id: string; label: string; color: string }[]);
     if (letgoRes.data) setLetgoItems(letgoRes.data.map((r: Record<string, unknown>) => ({
       dbId: r.id as string, id: r.item_id as string, reason: (r.reason as string) || undefined, addedAt: (r.added_at as string) || "",
+    })));
+    if (customCatsRes.data) {
+      const cats: Record<string, string> = {};
+      customCatsRes.data.forEach((r: Record<string, unknown>) => { cats[r.key as string] = r.label as string; });
+      setCustomCats(cats);
+    }
+    if (savedCombosRes.data) setSavedCombos(savedCombosRes.data.map((r: Record<string, unknown>) => ({
+      key: r.combo_key as string, combo: r.combo as SavedCombo["combo"], savedAt: r.saved_at as string,
     })));
     setLoading(false);
   }, []);
@@ -1104,7 +1114,14 @@ JSON 배열만 반환:
               <div key={combo.id} style={{ background: "rgba(255,255,255,0.7)", borderRadius: 14, padding: 16, marginBottom: 10, border: "1px solid rgba(0,0,0,0.06)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#6B2D3E" }}>{combo.description}</span>
-                  <button onClick={() => saved ? setSavedCombos(savedCombos.filter(s => s.key !== ck)) : setSavedCombos([...savedCombos, { key: ck, combo: comboForSave, savedAt: new Date().toISOString() }])} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 18, color: saved ? "#C4952B" : "#CCC" }}>{saved ? "★" : "☆"}</button>
+                  <button onClick={async () => {
+                    if (saved) {
+                      await supabase.from("saved_combos").delete().eq("combo_key", ck);
+                    } else {
+                      await supabase.from("saved_combos").insert({ combo_key: ck, combo: comboForSave });
+                    }
+                    fetchData();
+                  }} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 18, color: saved ? "#C4952B" : "#CCC" }}>{saved ? "★" : "☆"}</button>
                 </div>
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>{combo.mood.map(m => <span key={m} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: "rgba(0,0,0,0.06)", color: "#555" }}>{MOODS[m as Mood] || m}</span>)}</div>
                 <div style={{ fontSize: 12, color: "#555", lineHeight: 1.8 }}>
@@ -1363,7 +1380,7 @@ ${wardrobeSummary}
           {savedCombos.map((sc, idx) => (
             <div key={idx} style={{ background: "rgba(196,149,43,0.06)", borderRadius: 12, padding: "12px 16px", marginBottom: 6, border: "1px solid rgba(196,149,43,0.15)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div><div style={{ fontSize: 13, fontWeight: 500, color: "#2A2A2A" }}>{sc.combo.desc}</div><div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{getItem(sc.combo.bottom)?.name} + {sc.combo.tops.length}개 상의</div></div>
-              <button onClick={() => setSavedCombos(savedCombos.filter((_, i) => i !== idx))} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#C4952B", fontSize: 16, padding: 4 }}>★</button>
+              <button onClick={async () => { await supabase.from("saved_combos").delete().eq("combo_key", sc.key); fetchData(); }} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#C4952B", fontSize: 16, padding: 4 }}>★</button>
             </div>
           ))}
         </div>}
@@ -1494,7 +1511,7 @@ ${wardrobeSummary}
           onClose={() => { setEditingItem(null); setAddingItem(false); }}
           onGenerateCombos={editingItem ? generateCombosForItem : undefined}
           customCats={customCats}
-          onAddCat={(key, label) => setCustomCats({ ...customCats, [key]: label })}
+          onAddCat={async (key, label) => { await supabase.from("custom_categories").insert({ key, label }); fetchData(); }}
         />
       )}
 
