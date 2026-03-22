@@ -36,6 +36,7 @@ export interface WishItem {
   price?: string;
   status: "confirmed" | "summer" | "watch" | "hold";
   note: string;
+  link?: string;
 }
 
 // ─── CONSTANTS ──────────────────────────────────────────────────────

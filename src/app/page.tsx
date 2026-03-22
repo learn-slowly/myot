@@ -279,7 +279,7 @@ export default function Home() {
     if (combosRes.data) setCombos(combosRes.data as DbCombo[]);
     if (wishRes.data) setWishlist(wishRes.data.map((r: Record<string, unknown>) => ({
       id: r.id as string, name: r.name as string, price: r.price as string | undefined,
-      status: r.status as WishItem["status"], note: (r.note as string) || "",
+      status: r.status as WishItem["status"], note: (r.note as string) || "", link: r.link as string | undefined,
     })));
     if (ootdRes.data) setOotdLogs(ootdRes.data.map((r: Record<string, unknown>) => ({
       id: r.id as string, date: r.date as string, items: r.items as string[],
@@ -500,13 +500,19 @@ JSON 배열만 반환:
   };
 
   // ─── Wishlist CRUD ──────────────────────────────────────────────
+  const [editingWish, setEditingWish] = useState<WishItem | null>(null);
+
   const addWish = async (name: string) => {
     await supabase.from("wish_items").insert({ name, status: "watch", note: "" });
     setNewWish(""); fetchData();
   };
+  const saveWish = async (w: WishItem) => {
+    await supabase.from("wish_items").upsert({ id: w.id, name: w.name, price: w.price || null, status: w.status, note: w.note || "", link: w.link || null });
+    setEditingWish(null); fetchData();
+  };
   const removeWish = async (id: string) => {
     await supabase.from("wish_items").delete().eq("id", id);
-    fetchData();
+    setEditingWish(null); fetchData();
   };
 
   // ─── RENDER: OOTD ─────────────────────────────────────────────
@@ -928,9 +934,16 @@ ${wardrobeSummary}
           <div key={st} style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: STATUS_COLORS[st], marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: STATUS_COLORS[st] }} />{lb} ({its.length})</div>
             {its.map(w => (
-              <div key={w.id} style={{ background: "rgba(255,255,255,0.7)", borderRadius: 12, padding: "12px 16px", marginBottom: 6, border: "1px solid rgba(0,0,0,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div><div style={{ fontSize: 13, fontWeight: 500, color: "#2A2A2A" }}>{w.name}</div><div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{w.price && <span style={{ marginRight: 8 }}>{w.price}</span>}{w.note}</div></div>
-                <button onClick={() => removeWish(w.id)} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#CCC", fontSize: 16, padding: 4 }}>✕</button>
+              <div key={w.id} onClick={() => setEditingWish(w)} style={{ background: "rgba(255,255,255,0.7)", borderRadius: 12, padding: "12px 16px", marginBottom: 6, border: "1px solid rgba(0,0,0,0.06)", cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "#2A2A2A" }}>{w.name}</div>
+                  <span style={{ fontSize: 11, color: "#B0A090" }}>편집</span>
+                </div>
+                <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>
+                  {w.price && <span style={{ marginRight: 8 }}>{w.price}</span>}
+                  {w.note}
+                </div>
+                {w.link && <div style={{ fontSize: 11, marginTop: 4 }}><a href={w.link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: "#5A7BA0", textDecoration: "underline" }}>구매 링크</a></div>}
               </div>
             ))}
           </div>
@@ -1002,6 +1015,57 @@ ${wardrobeSummary}
           onGenerateCombos={editingItem ? generateCombosForItem : undefined}
         />
       )}
+
+      {/* Wish Edit Modal */}
+      {editingWish && (() => {
+        const WishModal = () => {
+          const [form, setForm] = useState({ ...editingWish });
+          const fieldStyle = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 13, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", boxSizing: "border-box" as const };
+          const labelStyle = { fontSize: 12, fontWeight: 600 as const, color: "#2A2A2A", marginBottom: 4, display: "block" };
+          return (
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={() => setEditingWish(null)}>
+              <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto", background: "linear-gradient(160deg, #F5F0E1, #E8E0D0)", borderRadius: "20px 20px 0 0", padding: "20px 16px 32px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: "#2A2A2A" }}>찜 아이템 편집</span>
+                  <button onClick={() => setEditingWish(null)} style={{ border: "none", background: "transparent", fontSize: 18, cursor: "pointer", color: "#888" }}>✕</button>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div>
+                    <label style={labelStyle}>이름</label>
+                    <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={fieldStyle} />
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={labelStyle}>가격</label>
+                      <input value={form.price || ""} onChange={e => setForm({ ...form, price: e.target.value || undefined })} style={fieldStyle} placeholder="53,000원" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={labelStyle}>상태</label>
+                      <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as WishItem["status"] })} style={fieldStyle}>
+                        {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>구매처 링크</label>
+                    <input value={form.link || ""} onChange={e => setForm({ ...form, link: e.target.value || undefined })} style={fieldStyle} placeholder="https://..." />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>메모</label>
+                    <input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} style={fieldStyle} placeholder="빼입기용, 여름에 필요" />
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+                  <button onClick={() => removeWish(form.id)} style={{ padding: "12px 16px", borderRadius: 10, border: "1.5px solid rgba(232,93,93,0.3)", background: "transparent", color: "#E85D5D", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>삭제</button>
+                  <button onClick={() => setEditingWish(null)} style={{ flex: 1, padding: 12, borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", color: "#888" }}>취소</button>
+                  <button onClick={() => saveWish(form)} style={{ flex: 2, padding: 12, borderRadius: 10, border: "none", background: "#2A2A2A", color: "#F5F0E1", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>저장</button>
+                </div>
+              </div>
+            </div>
+          );
+        };
+        return <WishModal />;
+      })()}
     </div>
   );
 }
