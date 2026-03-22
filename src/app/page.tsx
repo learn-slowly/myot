@@ -787,6 +787,8 @@ JSON 배열만 반환:
 
   // ─── CLOSET ───────────────────────────────────────────────────
   const [showClosetStats, setShowClosetStats] = useState(false);
+  const [statsSeason, setStatsSeason] = useState<string>(() => { const s = getCurrentSeason(); const y = new Date().getFullYear(); return `${y}-${s}`; });
+  const [statsYear, setStatsYear] = useState<number>(new Date().getFullYear());
 
   // 착용 빈도 계산
   const wearData = (() => {
@@ -803,16 +805,34 @@ JSON 배열만 반환:
 
   const renderClosetStats = () => {
     const now = new Date();
-    const curSeason = getCurrentSeason();
-    const seasonLabel = SEASONS[curSeason];
 
-    // 시즌 시작 월 계산
+    // 시즌별 필터
     const seasonStartMonth: Record<Season, number> = { spring: 3, summer: 6, fall: 9, winter: 12 };
-    const startMonth = seasonStartMonth[curSeason];
-    const seasonStart = new Date(startMonth === 12 && now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear(), startMonth - 1, 1);
+    const seasonEndMonth: Record<Season, number> = { spring: 5, summer: 8, fall: 11, winter: 2 };
+    const [selYear, selSeason] = statsSeason.split("-") as [string, Season];
+    const sYear = parseInt(selYear);
+    const sStart = new Date(selSeason === "winter" ? sYear : sYear, seasonStartMonth[selSeason] - 1, 1);
+    const sEndMonth = seasonEndMonth[selSeason];
+    const sEnd = new Date(selSeason === "winter" ? sYear + 1 : sYear, sEndMonth, 0, 23, 59, 59);
 
-    const thisSeasonNew = allItems.filter(i => i.purchased_at && new Date(i.purchased_at) >= seasonStart);
-    const thisYearNew = allItems.filter(i => i.purchased_at && i.purchased_at.startsWith(String(now.getFullYear())));
+    const seasonNew = allItems.filter(i => {
+      if (!i.purchased_at) return false;
+      const d = new Date(i.purchased_at);
+      return d >= sStart && d <= sEnd;
+    });
+    const yearNew = allItems.filter(i => i.purchased_at && i.purchased_at.startsWith(String(statsYear)));
+
+    // 선택 가능한 시즌/연도 목록 생성
+    const years = [...new Set(allItems.filter(i => i.purchased_at).map(i => parseInt(i.purchased_at!.slice(0, 4))))];
+    if (!years.includes(now.getFullYear())) years.push(now.getFullYear());
+    years.sort((a, b) => b - a);
+
+    const seasonOptions: { value: string; label: string }[] = [];
+    years.forEach(y => {
+      (["spring", "summer", "fall", "winter"] as Season[]).forEach(s => {
+        seasonOptions.push({ value: `${y}-${s}`, label: `${y} ${SEASONS[s]}` });
+      });
+    });
 
     const byAcquired: Record<string, number> = {};
     allItems.forEach(i => {
@@ -831,18 +851,28 @@ JSON 배열만 반환:
 
     return (
       <div style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-          <div style={{ ...statBox, flex: 1, textAlign: "center" }}>
-            <div style={statNum}>{allItems.length}</div>
-            <div style={statLabel}>전체 아이템</div>
+        <div style={{ ...statBox, marginBottom: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+            <select value={statsSeason} onChange={e => setStatsSeason(e.target.value)} style={{ flex: 1, padding: "6px 8px", borderRadius: 6, border: "1px solid rgba(0,0,0,0.1)", fontSize: 12, fontFamily: "inherit", background: "rgba(255,255,255,0.7)" }}>
+              {seasonOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <select value={statsYear} onChange={e => setStatsYear(parseInt(e.target.value))} style={{ flex: 1, padding: "6px 8px", borderRadius: 6, border: "1px solid rgba(0,0,0,0.1)", fontSize: 12, fontFamily: "inherit", background: "rgba(255,255,255,0.7)" }}>
+              {years.map(y => <option key={y} value={y}>{y}년</option>)}
+            </select>
           </div>
-          <div style={{ ...statBox, flex: 1, textAlign: "center" }}>
-            <div style={statNum}>{thisSeasonNew.length}</div>
-            <div style={statLabel}>이번 {seasonLabel} 신규</div>
-          </div>
-          <div style={{ ...statBox, flex: 1, textAlign: "center" }}>
-            <div style={statNum}>{thisYearNew.length}</div>
-            <div style={statLabel}>{now.getFullYear()}년 신규</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={statNum}>{allItems.length}</div>
+              <div style={statLabel}>전체</div>
+            </div>
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={statNum}>{seasonNew.length}</div>
+              <div style={statLabel}>{selYear} {SEASONS[selSeason]} 신규</div>
+            </div>
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={statNum}>{yearNew.length}</div>
+              <div style={statLabel}>{statsYear}년 신규</div>
+            </div>
           </div>
         </div>
 
