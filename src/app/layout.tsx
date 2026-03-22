@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   title: "내옷 myot",
   description: "AI 기반 개인 스타일 옷장 관리 — My Only Trend",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/icon-192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
