@@ -295,6 +295,7 @@ export default function Home() {
   const [letgoItems, setLetgoItems] = useState<{ dbId: string; id: string; reason?: string; addedAt: string; status: string }[]>([]);
   const [letgoAdding, setLetgoAdding] = useState(false);
   const [letgoSearch, setLetgoSearch] = useState("");
+  const [letgoRecCat, setLetgoRecCat] = useState<string>("all");
 
   // OOTD state
   const [ootdImage, setOotdImage] = useState<string | null>(null);
@@ -1560,16 +1561,24 @@ ${wardrobeSummary}
         )}
 
         {(() => {
-          const candidates = available
+          const allCats = { ...CATEGORIES, ...customCats };
+          const catsWithItems = Object.entries(allCats).filter(([k]) => available.some(i => i.cat === k));
+          const filteredAvailable = letgoRecCat === "all" ? available : available.filter(i => i.cat === letgoRecCat);
+          const candidates = filteredAvailable
             .map(i => ({ item: i, count: wearData.counts[i.id] || 0, lastWorn: wearData.lastDates[i.id] }))
             .sort((a, b) => a.count - b.count || (a.lastWorn || "0").localeCompare(b.lastWorn || "0"))
             .slice(0, 5);
-          if (candidates.length === 0) return null;
+          if (available.length === 0) return null;
           return (
             <div style={{ marginTop: 20 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: "#C4952B", marginBottom: 8 }}>비울 옷 추천</div>
-              <div style={{ fontSize: 11, color: "#888", marginBottom: 10 }}>착용 빈도가 낮은 아이템이에요</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
+                <Pill label="전체" active={letgoRecCat === "all"} onClick={() => setLetgoRecCat("all")} />
+                {catsWithItems.map(([k, v]) => <Pill key={k} label={v} active={letgoRecCat === k} onClick={() => setLetgoRecCat(k)} />)}
+              </div>
+              {candidates.length === 0 ? (
+                <div style={{ textAlign: "center", padding: 16, color: "#888", fontSize: 12 }}>이 카테고리에 추천할 아이템이 없어</div>
+              ) : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {candidates.map(({ item, count, lastWorn }) => (
                   <div key={item.id} style={{ background: "rgba(196,149,43,0.05)", borderRadius: 12, padding: "10px 14px", border: "1px solid rgba(196,149,43,0.15)", display: "flex", alignItems: "center", gap: 10 }}>
                     {item.image_url ? (
@@ -1589,7 +1598,7 @@ ${wardrobeSummary}
                     }} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(196,149,43,0.3)", background: "transparent", color: "#C4952B", cursor: "pointer", fontSize: 11, fontFamily: "inherit", fontWeight: 500, whiteSpace: "nowrap" }}>비움에 추가</button>
                   </div>
                 ))}
-              </div>
+              </div>}
             </div>
           );
         })()}
