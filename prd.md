@@ -47,40 +47,62 @@
 
 ## 2. 기능 명세
 
-### 2.1 핵심 기능 (MVP — 현재 프로토타입에 구현됨)
+### 2.1 핵심 기능 (구현 완료)
 
 #### 📸 OOTD (착장 기록)
 
 - 사진 업로드 (카메라 촬영 + 갤러리 선택)
-- Claude Vision API로 착장 분석 → 옷장 아이템 자동 매칭
-- 사용자가 틀린 것 수정 가능 (삭제/추가)
-- 날짜와 함께 저장
+- Claude Vision API로 착장 분석 → 옷장 아이템 자동 매칭 (소품 포함)
+- 사용자가 틀린 것 수정 가능 (삭제/추가 + 검색 기능)
+- 저장 시 AI가 최종 아이템 목록 기반 코디 코멘트 재생성
+- OOTD 사진을 Cloudinary에 업로드하여 기록에서 사진 확인 가능
 - 착용 통계: 자주 입는 옷 TOP 5, 미착용 아이템 목록
-- 최근 기록 타임라인
+- 최근 기록 타임라인 (사진 + AI 코멘트 + 아이템 태그)
 
 #### ◫ 옷장
 
-- 전체 아이템 카테고리별 보기
+- 전체 아이템 카테고리별 보기 (Supabase DB 연동)
 - 시즌별 필터 (봄/여름/가을/겨울)
-- 아이템별 색상 도트, 브랜드, 스타일 태그 표시
+- 아이템별 색상 도트 또는 사진 썸네일, 브랜드, 스타일 태그 표시
+- **아이템 편집**: 이름, 카테고리, 브랜드, 색상, 시즌, 스타일 태그, 메모 수정
+- **새 아이템 추가**: 추가 시 AI가 자동으로 기존 옷장 기반 코디 조합 생성 (최대 5개)
+- **아이템 삭제** 가능
+- **사진 등록**: Cloudinary CDN 업로드, 썸네일로 표시
 
-#### ◈ 코디 (하의 기반 추천)
+#### ◈ 코디 (자유 선택 추천)
 
-- 시즌 선택 → 해당 시즌 하의만 표시
-- 하의 선택 → 시즌별 완전 분리된 상의/아우터/신발 조합 추천
+- 시즌 선택 → 하의/상의/아우터 중 **아무 아이템이나 먼저 선택 가능**
+- 선택한 아이템 기반으로 나머지 슬롯 자동 필터링
+- 추가 선택할수록 조합이 좁혀짐
+- 선택한 슬롯은 해당 아이템만 결과에 표시 (다른 후보 제외)
 - 조합 ★ 저장 가능
 - 기분(편하게/깔끔하게/멋있게/공식자리) 태그
 
-#### ☀ 오늘 뭐 입지 (무드 기반 추천)
+#### ☀ 오늘 뭐 입지 (날씨 + 무드 기반 추천)
 
-- 기분 선택 + 시즌 선택
-- 조건에 맞는 조합 중 랜덤 3개 추천
-- "다른 조합 보기" 셔플
+- **Open-Meteo 날씨 연동**: 현재 기온/날씨 자동 가져옴 (위치 기반, 서울 기본값)
+- 기온 → 시즌 자동 판단 (25°C+→여름, 15\~24→봄/가을, \~14→겨울)
+- 비 오는 날: 비 관련 신발(캠퍼스 회색, 장화) 포함 조합 우선
+- 최근 OOTD와 겹치지 않는 조합 우선 추천
+- 기분 선택 + 시즌 수동 오버라이드 가능
+- 조건에 맞는 조합 중 3개 추천 + "다른 조합 보기" 셔플
+
+#### 🤔 살/말 (AI 구매 판단)
+
+- 사고 싶은 옷 사진 업로드 → AI가 옷장 데이터 기반 분석
+- 중복 체크: 비슷한 아이템이 이미 있는지
+- 활용도: 기존 옷들과 새 조합 가능성
+- 스타일 적합성: 워크웨어/아이비/힙합 스타일 축에 맞는지
+- 색상 조화: 웜톤 어스톤 컬러 팔레트와의 조화
+- 최종 판정: 🟢 살 / 🟡 고민 / 🔴 말
+- "살/고민" 판정 시 찜 목록에 바로 추가 가능
 
 #### ★ 찜 (위시리스트)
 
-- 구매 예정 / 여름에 찾기 / 나오면 잡기 / 보류 상태 관리
-- 아이템 추가/삭제
+- **커스텀 상태 카테고리**: 기본 제공 + 사용자가 원하는 상태 자유 추가 (봄/가을에 찾기, 겨울에 찾기 등)
+- 아이템별 상세 편집: 가격, 구매처 링크(URL), 상태, 메모, 사진
+- 사진 업로드 (Cloudinary CDN), 목록에 썸네일 표시
+- 구매 링크 클릭으로 바로 이동
 - 저장한 코디 목록
 
 ### 2.2 온보딩 & 옷 등록 플로우
@@ -151,23 +173,27 @@
 
 ## 3. 기술 스택
 
-### 3.1 현재 (MVP)
+### 3.1 현재
 
 - **프레임워크**: Next.js 15 + TypeScript
 - **스타일링**: Tailwind CSS v4
 - **폰트**: Pretendard Variable
-- **데이터 저장**: localStorage (useLocalStorage 커스텀 훅)
-- **AI 분석**: Anthropic API (Claude Sonnet) — 클라이언트에서 직접 호출
-- **배포**: Vercel
+- **DB**: Supabase PostgreSQL (ap-northeast-2 서울 리전)
+- **이미지 저장**: Cloudinary CDN (서버사이드 signed upload)
+- **AI 분석**: Anthropic API (Claude Sonnet) — Next.js API Route 경유 (키 보호)
+  - `/api/analyze`: 이미지 + 텍스트 분석 (OOTD, 살/말)
+  - `/api/analyze-text`: 텍스트 전용 분석 (코디 코멘트, 조합 생성)
+  - `/api/upload`: Cloudinary 서버사이드 업로드
+- **날씨**: Open-Meteo API (무료, 키 불필요, 상용 가능)
+- **배포**: Vercel (GitHub 자동 배포, Preview + Production 환경)
 - **PWA**: manifest.json + apple-touch-icon 설정 완료
 
 ### 3.2 향후 (v2)
 
-- **DB**: Supabase (PostgreSQL)
-- **이미지 저장**: Supabase Storage
 - **인증**: Supabase Auth
-- **AI 분석**: Next.js API Route 경유로 변경 (API 키 보호)
 - **알림**: 웹 푸시 또는 카카오 알림톡
+- **스타일 축 온보딩**: 첫 실행 시 스타일 선택
+- **착용 통계 고도화**: 월별/시즌별 리포트, cost-per-wear
 
 ---
 
@@ -391,20 +417,27 @@ interface WishItem {
 ```
 myot/
 ├── public/
-│   └── manifest.json          # PWA 설정
+│   └── manifest.json              # PWA 설정
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx         # 루트 레이아웃 (Pretendard 폰트, PWA 메타)
-│   │   ├── page.tsx           # 메인 앱 (5탭: OOTD/옷장/코디/무드/찜)
-│   │   └── globals.css        # Tailwind v4 + 테마 변수
+│   │   ├── layout.tsx             # 루트 레이아웃 (Pretendard 폰트, PWA 메타)
+│   │   ├── page.tsx               # 메인 앱 (6탭: OOTD/옷장/코디/오늘뭐입지/살말/찜)
+│   │   ├── globals.css            # Tailwind v4 + 테마 변수
+│   │   └── api/
+│   │       ├── analyze/route.ts   # Claude Vision API (이미지 분석)
+│   │       ├── analyze-text/route.ts # Claude API (텍스트 분석)
+│   │       └── upload/route.ts    # Cloudinary 서버사이드 업로드
+│   ├── lib/
+│   │   └── supabase.ts            # Supabase 클라이언트
 │   ├── data/
-│   │   ├── closet.ts          # 아이템, 조합, 타입, 상수 전체
-│   │   └── useLocalStorage.ts # localStorage persist 훅
-│   └── components/            # (향후 분리)
-├── package.json               # Next.js 15 + React 19 + Tailwind v4
+│   │   ├── closet.ts              # 타입, 상수 (카테고리/시즌/무드/태그)
+│   │   └── useLocalStorage.ts     # localStorage persist 훅
+│   └── components/                # (향후 분리)
+├── package.json
 ├── tsconfig.json
 ├── next.config.ts
 ├── postcss.config.mjs
+├── prd.md                         # 이 문서
 └── .gitignore
 ```
 
@@ -437,15 +470,27 @@ gh repo create myot --public --push
 # vercel.com에서 myot 레포 Import → 자동 배포
 ```
 
-### 8.2 주요 TODO
+### 8.2 완료된 TODO
 
-- \[ \] GitHub 레포 `myot` 생성 및 배포
+- \[x\] GitHub 레포 `myot` 생성 및 배포
+- \[x\] OOTD AI 분석을 API Route로 이동 (API 키 보호)
+- \[x\] Supabase 연결 (clothing_items, combos, ootd_logs, wish_items, wish_statuses)
+- \[x\] Cloudinary 이미지 업로드 연동
+- \[x\] 옷장 아이템 CRUD (추가/편집/삭제)
+- \[x\] 새 아이템 추가 시 AI 코디 조합 자동 생성
+- \[x\] 코디 탭: 하의/상의/아우터 자유 선택 방식으로 전환
+- \[x\] 오늘 뭐 입지: Open-Meteo 날씨 연동
+- \[x\] 살/말: AI 구매 판단 기능
+- \[x\] 찜: 커스텀 상태 + 이미지 + 구매 링크
+
+### 8.3 남은 TODO
+
 - \[ \] PWA 아이콘 생성 (icon-192.png, icon-512.png)
-- \[ \] OOTD AI 분석을 API Route로 이동 (API 키 보호)
-- \[ \] 레포명/패키지명을 `myot`으로 통일
-- \[ \] Supabase 연결 (v2)
-- \[ \] 스타일 축 온보딩 (v2)
-- \[ \] 착용 통계 리포트 고도화 (v2)
+- \[ \] 스타일 축 온보딩 (첫 실행 시)
+- \[ \] 착용 통계 리포트 고도화
+- \[ \] Supabase Auth (다중 사용자)
+- \[ \] 컴포넌트 분리 리팩토링 (page.tsx가 큼)
+- \[ \] 중고 연동 (처분 추천 → 번개장터/당근)
 
 ### 8.3 디자인 시스템
 
