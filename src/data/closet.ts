@@ -17,6 +17,7 @@ export interface ClothingItem {
   season?: Season[];
   tags: StyleTag[];
   note?: string;
+  image_url?: string;
 }
 
 export interface Combo {
