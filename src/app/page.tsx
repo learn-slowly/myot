@@ -1065,15 +1065,13 @@ ${itemSummary}
         <button onClick={() => setShowClosetStats(!showClosetStats)} style={{ fontSize: 12, color: "#6B2D3E", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>{showClosetStats ? "통계 접기 ▲" : "옷장 통계 ▼"}</button>
       </div>
       {showClosetStats && renderClosetStats()}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <Pill label="전체" active={closetFilter === "all"} onClick={() => setClosetFilter("all")} />
-          {Object.entries(SEASONS).map(([k, v]) => <Pill key={k} label={v} active={closetFilter === k} onClick={() => setClosetFilter(k as Season)} count={allItems.filter(i => i.season?.includes(k as Season)).length} />)}
-        </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          <button onClick={() => setClosetViewMode("category")} style={{ padding: "4px 10px", borderRadius: 6, border: "none", fontSize: 11, fontFamily: "inherit", cursor: "pointer", background: closetViewMode === "category" ? "#2A2A2A" : "rgba(0,0,0,0.06)", color: closetViewMode === "category" ? "#F5F0E1" : "#888", fontWeight: 500 }}>종류</button>
-          <button onClick={() => setClosetViewMode("date")} style={{ padding: "4px 10px", borderRadius: 6, border: "none", fontSize: 11, fontFamily: "inherit", cursor: "pointer", background: closetViewMode === "date" ? "#2A2A2A" : "rgba(0,0,0,0.06)", color: closetViewMode === "date" ? "#F5F0E1" : "#888", fontWeight: 500 }}>입고순</button>
-        </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+        <Pill label="전체" active={closetFilter === "all"} onClick={() => setClosetFilter("all")} />
+        {Object.entries(SEASONS).map(([k, v]) => <Pill key={k} label={v} active={closetFilter === k} onClick={() => setClosetFilter(k as Season)} count={allItems.filter(i => i.season?.includes(k as Season)).length} />)}
+      </div>
+      <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+        <button onClick={() => setClosetViewMode("category")} style={{ padding: "5px 12px", borderRadius: 6, border: "none", fontSize: 11, fontFamily: "inherit", cursor: "pointer", background: closetViewMode === "category" ? "#2A2A2A" : "rgba(0,0,0,0.06)", color: closetViewMode === "category" ? "#F5F0E1" : "#888", fontWeight: 500 }}>종류별</button>
+        <button onClick={() => setClosetViewMode("date")} style={{ padding: "5px 12px", borderRadius: 6, border: "none", fontSize: 11, fontFamily: "inherit", cursor: "pointer", background: closetViewMode === "date" ? "#2A2A2A" : "rgba(0,0,0,0.06)", color: closetViewMode === "date" ? "#F5F0E1" : "#888", fontWeight: 500 }}>입고순</button>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {closetViewMode === "category" ? (
