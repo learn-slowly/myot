@@ -38,6 +38,7 @@ interface OotdLog {
   items: string[];
   description: string;
   image_url?: string;
+  memo?: string;
 }
 
 interface SavedCombo {
@@ -289,7 +290,7 @@ export default function Home() {
     })));
     if (ootdRes.data) setOotdLogs(ootdRes.data.map((r: Record<string, unknown>) => ({
       id: r.id as string, date: r.date as string, items: r.items as string[],
-      description: (r.description as string) || "", image_url: r.image_url as string | undefined,
+      description: (r.description as string) || "", image_url: r.image_url as string | undefined, memo: (r.memo as string) || undefined,
     })));
     if (statusRes.data) setWishStatuses(statusRes.data as { id: string; label: string; color: string }[]);
     setLoading(false);
@@ -505,6 +506,7 @@ JSON 배열만 반환:
   };
 
   const [ootdSaving, setOotdSaving] = useState(false);
+  const [ootdMemo, setOotdMemo] = useState("");
 
   const saveOotdRecord = async () => {
     if (!ootdResult || ootdResult.items.length === 0) return;
@@ -534,12 +536,12 @@ JSON 배열만 반환:
         })(),
       ]);
       const text = commentRes.content?.map((c: { text?: string }) => c.text || "").join("") || ootdResult.description;
-      await supabase.from("ootd_logs").insert({ date: new Date().toISOString().split("T")[0], items: ootdResult.items, description: text, image_url: imageUrl });
-      setOotdImage(null); setOotdResult(null); setOotdStatsView(true);
+      await supabase.from("ootd_logs").insert({ date: new Date().toISOString().split("T")[0], items: ootdResult.items, description: text, image_url: imageUrl, memo: ootdMemo.trim() || null });
+      setOotdImage(null); setOotdResult(null); setOotdMemo(""); setOotdStatsView(true);
       fetchData();
     } catch {
-      await supabase.from("ootd_logs").insert({ date: new Date().toISOString().split("T")[0], items: ootdResult.items, description: ootdResult.description });
-      setOotdImage(null); setOotdResult(null); setOotdStatsView(true);
+      await supabase.from("ootd_logs").insert({ date: new Date().toISOString().split("T")[0], items: ootdResult.items, description: ootdResult.description, memo: ootdMemo.trim() || null });
+      setOotdImage(null); setOotdResult(null); setOotdMemo(""); setOotdStatsView(true);
       fetchData();
     }
     setOotdSaving(false);
@@ -630,6 +632,7 @@ JSON 배열만 반환:
                 </div>
               )}
               <div style={{ fontSize: 12, color: "#555", marginBottom: 6, lineHeight: 1.5 }}>{log.description}</div>
+              {log.memo && <div style={{ fontSize: 11, color: "#888", marginBottom: 6, fontStyle: "italic", lineHeight: 1.5 }}>{log.memo}</div>}
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {log.items.map(id => { const item = getItem(id); if (!item) return null; return <span key={id} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 16, background: "rgba(0,0,0,0.06)", color: "#555" }}>{item.name}</span>; })}
               </div>
@@ -696,8 +699,9 @@ JSON 배열만 반환:
               ) : (
                 <button onClick={() => setOotdAddPicker(true)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1.5px dashed rgba(0,0,0,0.12)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888", marginBottom: 12 }}>+ 아이템 추가/수정</button>
               )}
+              <textarea value={ootdMemo} onChange={e => setOotdMemo(e.target.value)} placeholder="메모 (선택) — 어디 가는 길, 느낀 점 등" rows={2} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 12, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", marginBottom: 10, boxSizing: "border-box", resize: "vertical" }} />
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => { setOotdImage(null); setOotdResult(null); setOotdAddPicker(false); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888" }}>취소</button>
+                <button onClick={() => { setOotdImage(null); setOotdResult(null); setOotdAddPicker(false); setOotdMemo(""); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888" }}>취소</button>
                 <button onClick={saveOotdRecord} disabled={ootdSaving || ootdResult.items.length === 0} style={{ flex: 2, padding: 10, borderRadius: 10, border: "none", background: ootdSaving ? "#B0A090" : "#6B2D3E", color: "#fff", cursor: ootdSaving ? "default" : "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>{ootdSaving ? "AI 코멘트 생성 중..." : "오늘 착장 저장하기"}</button>
               </div>
             </div>
