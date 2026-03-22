@@ -3,10 +3,7 @@ export type Season = "spring" | "summer" | "fall" | "winter";
 export type Mood = "casual" | "neat" | "cool" | "formal";
 export type StyleTag = "워크웨어" | "아이비" | "프레피" | "힙합" | "캐주얼" | "공식" | "아웃도어" | "특수" | "데일리";
 
-export type CategoryKey =
-  | "bottoms" | "shirts" | "knits" | "hoodies" | "longTees"
-  | "shortTees" | "poloTees" | "outerWinter" | "outerSpringFall"
-  | "outerSummer" | "shoes" | "accessories";
+export type CategoryKey = string;
 
 export interface ClothingItem {
   id: string;
@@ -43,7 +40,7 @@ export interface WishItem {
 }
 
 // ─── CONSTANTS ──────────────────────────────────────────────────────
-export const CATEGORIES: Record<CategoryKey, string> = {
+export const CATEGORIES: Record<string, string> = {
   bottoms: "하의",
   shirts: "긴팔 셔츠",
   knits: "니트/가디건",

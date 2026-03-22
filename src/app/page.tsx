@@ -134,13 +134,18 @@ const ALL_TAGS = Object.keys(TAG_COLORS) as import("@/data/closet").StyleTag[];
 const ALL_SEASONS: Season[] = ["spring", "summer", "fall", "winter"];
 const ALL_CATS = Object.keys(CATEGORIES) as CategoryKey[];
 
-function ItemEditModal({ item, onSave, onDelete, onClose, onGenerateCombos }: {
+function ItemEditModal({ item, onSave, onDelete, onClose, onGenerateCombos, customCats, onAddCat }: {
   item: ClothingItem | null; onSave: (item: ClothingItem) => void; onDelete?: (id: string) => void; onClose: () => void; onGenerateCombos?: (item: ClothingItem) => void;
+  customCats: Record<string, string>; onAddCat: (key: string, label: string) => void;
 }) {
   const isNew = !item;
   const [form, setForm] = useState<ClothingItem>(item || {
     id: `custom-${Date.now()}`, cat: "bottoms" as CategoryKey, name: "", brand: "", color: "", season: [], tags: [], note: "",
   });
+
+  const [addingCat, setAddingCat] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const allCats = { ...CATEGORIES, ...customCats };
 
   const fieldStyle = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 13, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", boxSizing: "border-box" as const };
   const labelStyle = { fontSize: 12, fontWeight: 600 as const, color: "#2A2A2A", marginBottom: 4, display: "block" };
@@ -161,9 +166,20 @@ function ItemEditModal({ item, onSave, onDelete, onClose, onGenerateCombos }: {
 
           <div>
             <label style={labelStyle}>카테고리</label>
-            <select value={form.cat} onChange={e => setForm({ ...form, cat: e.target.value as CategoryKey })} style={fieldStyle}>
-              {ALL_CATS.map(c => <option key={c} value={c}>{CATEGORIES[c]}</option>)}
-            </select>
+            {addingCat ? (
+              <div style={{ display: "flex", gap: 6 }}>
+                <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="새 카테고리 이름" autoFocus style={{ ...fieldStyle, flex: 1 }} />
+                <button onClick={() => { if (newCatName.trim()) { const key = `custom_${Date.now()}`; onAddCat(key, newCatName.trim()); setForm({ ...form, cat: key }); setNewCatName(""); setAddingCat(false); } }} style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "#2A2A2A", color: "#F5F0E1", cursor: "pointer", fontSize: 12, fontFamily: "inherit", whiteSpace: "nowrap" }}>추가</button>
+                <button onClick={() => { setAddingCat(false); setNewCatName(""); }} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", color: "#888", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>취소</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 6 }}>
+                <select value={form.cat} onChange={e => setForm({ ...form, cat: e.target.value as CategoryKey })} style={{ ...fieldStyle, flex: 1 }}>
+                  {Object.entries(allCats).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+                <button onClick={() => setAddingCat(true)} style={{ padding: "8px 12px", borderRadius: 8, border: "1.5px dashed rgba(0,0,0,0.15)", background: "transparent", color: "#888", cursor: "pointer", fontSize: 12, fontFamily: "inherit", whiteSpace: "nowrap" }}>+ 새 카테고리</button>
+              </div>
+            )}
           </div>
 
           <div style={{ display: "flex", gap: 8 }}>
@@ -261,6 +277,8 @@ export default function Home() {
   const [ootdLogs, setOotdLogs] = useState<OotdLog[]>([]);
   const [wishStatuses, setWishStatuses] = useState<{ id: string; label: string; color: string }[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [customCats, setCustomCats] = useLocalStorage<Record<string, string>>("myot-custom-cats", {});
 
   // 살/말 state
   const [buyImage, setBuyImage] = useState<string | null>(null);
@@ -720,7 +738,7 @@ JSON 배열만 반환:
                     {allItems.filter(i => !ootdResult.items.includes(i.id)).filter(i => {
                       if (!ootdSearchQuery.trim()) return true;
                       const q = ootdSearchQuery.toLowerCase();
-                      return i.name.toLowerCase().includes(q) || (i.brand || "").toLowerCase().includes(q) || (i.color || "").toLowerCase().includes(q) || CATEGORIES[i.cat].includes(q);
+                      return i.name.toLowerCase().includes(q) || (i.brand || "").toLowerCase().includes(q) || (i.color || "").toLowerCase().includes(q) || (CATEGORIES[i.cat] || customCats[i.cat] || i.cat).includes(q);
                     }).map(item => (
                       <ItemCard key={item.id} item={item} compact onClick={() => setOotdResult({ ...ootdResult, items: [...ootdResult.items, item.id] })} />
                     ))}
@@ -752,7 +770,7 @@ JSON 배열만 반환:
         {Object.entries(SEASONS).map(([k, v]) => <Pill key={k} label={v} active={closetFilter === k} onClick={() => setClosetFilter(k as Season)} count={allItems.filter(i => i.season?.includes(k as Season)).length} />)}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {(Object.keys(CATEGORIES) as CategoryKey[]).map(ck => {
+        {Object.entries({ ...CATEGORIES, ...customCats }).map(([ck, catLabel]) => {
           let items = allItems.filter(i => i.cat === ck);
           if (closetFilter !== "all") items = items.filter(i => !i.season || i.season.includes(closetFilter));
           if (!items.length) return null;
@@ -760,7 +778,7 @@ JSON 배열만 반환:
           return (
             <div key={ck} style={{ background: "rgba(255,255,255,0.5)", borderRadius: 14, border: "1px solid rgba(0,0,0,0.06)", overflow: "hidden" }}>
               <button onClick={() => setExpandedCat(isOpen ? null : ck)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "14px 18px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#2A2A2A" }}>{CATEGORIES[ck]}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#2A2A2A" }}>{catLabel}</span>
                 <span style={{ fontSize: 12, color: "#888" }}>{items.length}개 {isOpen ? "▲" : "▼"}</span>
               </button>
               {isOpen && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1165,6 +1183,8 @@ ${wardrobeSummary}
           onDelete={editingItem ? deleteItem : undefined}
           onClose={() => { setEditingItem(null); setAddingItem(false); }}
           onGenerateCombos={editingItem ? generateCombosForItem : undefined}
+          customCats={customCats}
+          onAddCat={(key, label) => setCustomCats({ ...customCats, [key]: label })}
         />
       )}
 
