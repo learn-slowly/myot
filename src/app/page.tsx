@@ -216,7 +216,7 @@ function ItemEditModal({ item, onSave, onDelete, onClose }: {
 
 // ─── Main App ───────────────────────────────────────────────────────
 export default function Home() {
-  const [view, setView] = useState<"ootd" | "closet" | "combo" | "mood" | "wishlist">("closet");
+  const [view, setView] = useState<"ootd" | "closet" | "combo" | "mood" | "buyornot" | "wishlist">("closet");
   const [comboSelections, setComboSelections] = useState<{ bottom?: string; top?: string; outer?: string }>({});
   const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
@@ -239,6 +239,12 @@ export default function Home() {
   const [wishlist, setWishlist] = useState<WishItem[]>([]);
   const [ootdLogs, setOotdLogs] = useState<OotdLog[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // 살/말 state
+  const [buyImage, setBuyImage] = useState<string | null>(null);
+  const [buyAnalyzing, setBuyAnalyzing] = useState(false);
+  const [buyResult, setBuyResult] = useState<{ verdict: string; emoji: string; analysis: string } | null>(null);
+  const buyFileRef = useRef<HTMLInputElement>(null);
 
   // Local state
   const [savedCombos, setSavedCombos] = useLocalStorage<SavedCombo[]>("lego-saved-combos", []);
@@ -722,6 +728,118 @@ export default function Home() {
     );
   };
 
+  // ─── BUY OR NOT (살/말) ─────────────────────────────────────────
+  const analyzeBuyOrNot = async () => {
+    if (!buyImage) return;
+    setBuyAnalyzing(true);
+    try {
+      const resized = await resizeImage(buyImage, 1024);
+      const base64 = resized.split(",")[1];
+
+      const wardrobeSummary = allItems.filter(i => i.cat !== "accessories").map(i =>
+        `${i.name}${i.color ? ` (${i.color})` : ""}${i.brand ? ` [${i.brand}]` : ""} — ${CATEGORIES[i.cat]}${i.season ? ` [${i.season.map(s => SEASONS[s]).join("/")}]` : ""}`
+      ).join("\n");
+
+      const prompt = `사진 속 옷에 대해 "살까 말까" 판단을 해줘.
+
+현재 옷장:
+${wardrobeSummary}
+
+스타일 축: 워크웨어, 아이비/프레피, 힙합 캐주얼
+퍼스널컬러: 웜톤 가을(Autumn) — 어스톤 컬러(브라운, 카키, 샌드베이지, 머스터드)
+개인 원칙: 빼입기 선호, 안 입는 옷 사지 않기, 모자 안 씀, 노란색은 어렵다(머스터드가 한계)
+
+분석해줄 것:
+1. 중복 체크: 옷장에 비슷한 아이템이 있는지
+2. 활용도: 이 아이템이 있으면 기존 옷들과 새 조합이 몇 개나 가능한지
+3. 스타일 적합성: 내 스타일 축에 맞는지
+4. 색상 조화: 내 옷장 컬러 팔레트와 어울리는지
+
+답변 형식 (JSON만):
+{"verdict": "살" 또는 "고민" 또는 "말", "analysis": "한국어로 4-5문장 분석. 각 항목(중복/활용도/스타일/색상)을 자연스럽게 포함해서."}`;
+
+      const response = await fetch("/api/analyze", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64, mediaType: "image/jpeg", prompt }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      const text = data.content?.map((c: { text?: string }) => c.text || "").join("") || "";
+      const clean = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(clean);
+      const emojiMap: Record<string, string> = { "살": "🟢", "고민": "🟡", "말": "🔴" };
+      setBuyResult({ verdict: parsed.verdict, emoji: emojiMap[parsed.verdict] || "🟡", analysis: parsed.analysis });
+    } catch (err) {
+      console.error("Buy analysis error:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setBuyResult({ verdict: "오류", emoji: "⚠️", analysis: `분석에 실패했어: ${msg}` });
+    }
+    setBuyAnalyzing(false);
+  };
+
+  const renderBuyOrNot = () => (
+    <div>
+      <div style={{ fontSize: 12, color: "#888", marginBottom: 16, lineHeight: 1.5 }}>
+        사고 싶은 옷 사진을 올려봐. 옷장 데이터를 기반으로 살지 말지 판단해줄게.
+      </div>
+      <input ref={buyFileRef} type="file" accept="image/*" onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => { setBuyImage(reader.result as string); setBuyResult(null); };
+        reader.readAsDataURL(file);
+      }} style={{ display: "none" }} />
+
+      {!buyImage && (
+        <button onClick={() => buyFileRef.current?.click()} style={{ width: "100%", padding: "40px 20px", borderRadius: 16, border: "2px dashed rgba(107,45,62,0.2)", background: "rgba(107,45,62,0.03)", cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 32 }}>🤔</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "#6B2D3E" }}>이거 살까 말까?</span>
+          <span style={{ fontSize: 11, color: "#888" }}>사진을 올리면 내 옷장 기준으로 분석해줄게</span>
+        </button>
+      )}
+
+      {buyImage && !buyResult && !buyAnalyzing && (
+        <div>
+          <div style={{ borderRadius: 16, overflow: "hidden", marginBottom: 12, maxHeight: 400, display: "flex", justifyContent: "center", background: "#000" }}>
+            <img src={buyImage} style={{ maxWidth: "100%", maxHeight: 400, objectFit: "contain" }} alt="Buy?" />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setBuyImage(null)} style={{ flex: 1, padding: 12, borderRadius: 12, border: "1.5px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", color: "#888" }}>다시 선택</button>
+            <button onClick={analyzeBuyOrNot} style={{ flex: 2, padding: 12, borderRadius: 12, border: "none", background: "#2A2A2A", color: "#F5F0E1", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>AI 분석하기</button>
+          </div>
+        </div>
+      )}
+
+      {buyAnalyzing && (
+        <div style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>🤔</div>
+          <div style={{ fontSize: 13, color: "#888" }}>옷장이랑 비교하는 중...</div>
+        </div>
+      )}
+
+      {buyResult && (
+        <div>
+          {buyImage && (
+            <div style={{ borderRadius: 16, overflow: "hidden", marginBottom: 12, maxHeight: 300, display: "flex", justifyContent: "center", background: "#000" }}>
+              <img src={buyImage} style={{ maxWidth: "100%", maxHeight: 300, objectFit: "contain" }} alt="Buy?" />
+            </div>
+          )}
+          <div style={{ background: "rgba(255,255,255,0.7)", borderRadius: 14, padding: 20, marginBottom: 12, border: "1px solid rgba(0,0,0,0.06)", textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 8 }}>{buyResult.emoji}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#2A2A2A", marginBottom: 16 }}>{buyResult.verdict}</div>
+            <div style={{ fontSize: 13, color: "#555", lineHeight: 1.8, textAlign: "left" }}>{buyResult.analysis}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => { setBuyImage(null); setBuyResult(null); }} style={{ flex: 1, padding: 12, borderRadius: 12, border: "1.5px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", color: "#888" }}>다른 옷 분석</button>
+            {buyResult.verdict === "살" && (
+              <button onClick={() => { setView("wishlist"); setNewWish(""); }} style={{ flex: 1, padding: 12, borderRadius: 12, border: "none", background: "#6B2D3E", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>찜 목록에 추가</button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   // ─── WISHLIST ──────────────────────────────────────────────────
   const renderWishlist = () => {
     const grouped: Record<string, WishItem[]> = {};
@@ -764,6 +882,7 @@ export default function Home() {
     { key: "closet" as const, label: "옷장", icon: "◫" },
     { key: "combo" as const, label: "코디", icon: "◈" },
     { key: "mood" as const, label: "오늘 뭐 입지", icon: "☀" },
+    { key: "buyornot" as const, label: "살/말", icon: "🤔" },
     { key: "wishlist" as const, label: "찜", icon: "★" },
   ];
 
@@ -791,6 +910,7 @@ export default function Home() {
         {view === "closet" && renderCloset()}
         {view === "combo" && renderCombo()}
         {view === "mood" && renderMood()}
+        {view === "buyornot" && renderBuyOrNot()}
         {view === "wishlist" && renderWishlist()}
       </div>
 
