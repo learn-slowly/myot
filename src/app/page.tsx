@@ -247,7 +247,7 @@ export default function Home() {
   // 살/말 state
   const [buyImage, setBuyImage] = useState<string | null>(null);
   const [buyAnalyzing, setBuyAnalyzing] = useState(false);
-  const [buyResult, setBuyResult] = useState<{ verdict: string; emoji: string; analysis: string } | null>(null);
+  const [buyResult, setBuyResult] = useState<{ verdict: string; emoji: string; analysis: string; itemName: string } | null>(null);
   const buyFileRef = useRef<HTMLInputElement>(null);
 
   // Local state
@@ -826,7 +826,7 @@ ${wardrobeSummary}
 4. 색상 조화: 내 옷장 컬러 팔레트와 어울리는지
 
 답변 형식 (JSON만):
-{"verdict": "살" 또는 "고민" 또는 "말", "analysis": "한국어로 4-5문장 분석. 각 항목(중복/활용도/스타일/색상)을 자연스럽게 포함해서."}`;
+{"verdict": "살" 또는 "고민" 또는 "말", "itemName": "사진 속 아이템 이름 (예: 네이비 치노 팬츠)", "analysis": "한국어로 4-5문장 분석. 각 항목(중복/활용도/스타일/색상)을 자연스럽게 포함해서."}`;
 
       const response = await fetch("/api/analyze", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -838,11 +838,11 @@ ${wardrobeSummary}
       const clean = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean);
       const emojiMap: Record<string, string> = { "살": "🟢", "고민": "🟡", "말": "🔴" };
-      setBuyResult({ verdict: parsed.verdict, emoji: emojiMap[parsed.verdict] || "🟡", analysis: parsed.analysis });
+      setBuyResult({ verdict: parsed.verdict, emoji: emojiMap[parsed.verdict] || "🟡", analysis: parsed.analysis, itemName: parsed.itemName || "분석 아이템" });
     } catch (err) {
       console.error("Buy analysis error:", err);
       const msg = err instanceof Error ? err.message : String(err);
-      setBuyResult({ verdict: "오류", emoji: "⚠️", analysis: `분석에 실패했어: ${msg}` });
+      setBuyResult({ verdict: "오류", emoji: "⚠️", analysis: `분석에 실패했어: ${msg}`, itemName: "" });
     }
     setBuyAnalyzing(false);
   };
@@ -901,8 +901,11 @@ ${wardrobeSummary}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => { setBuyImage(null); setBuyResult(null); }} style={{ flex: 1, padding: 12, borderRadius: 12, border: "1.5px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", color: "#888" }}>다른 옷 분석</button>
-            {buyResult.verdict === "살" && (
-              <button onClick={() => { setView("wishlist"); setNewWish(""); }} style={{ flex: 1, padding: 12, borderRadius: 12, border: "none", background: "#6B2D3E", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>찜 목록에 추가</button>
+            {(buyResult.verdict === "살" || buyResult.verdict === "고민") && (
+              <button onClick={async () => {
+                await supabase.from("wish_items").insert({ name: buyResult.itemName || "살/말 분석 아이템", status: buyResult.verdict === "살" ? "confirmed" : "watch", note: buyResult.analysis.slice(0, 100) });
+                setBuyImage(null); setBuyResult(null); setView("wishlist"); fetchData();
+              }} style={{ flex: 1, padding: 12, borderRadius: 12, border: "none", background: "#6B2D3E", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>찜 목록에 추가</button>
             )}
           </div>
         </div>
