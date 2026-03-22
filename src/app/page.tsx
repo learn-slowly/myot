@@ -1562,10 +1562,14 @@ ${wardrobeSummary}
 
         {(() => {
           const allCats = { ...CATEGORIES, ...customCats };
-          const catsWithItems = Object.entries(allCats).filter(([k]) => available.some(i => i.cat === k));
+          const allCounts = available.map(i => wearData.counts[i.id] || 0);
+          const avgCount = allCounts.length > 0 ? allCounts.reduce((a, b) => a + b, 0) / allCounts.length : 0;
+          const threshold = Math.floor(avgCount / 2);
+          const catsWithItems = Object.entries(allCats).filter(([k]) => available.some(i => i.cat === k && (wearData.counts[i.id] || 0) <= threshold));
           const filteredAvailable = letgoRecCat === "all" ? available : available.filter(i => i.cat === letgoRecCat);
           const candidates = filteredAvailable
             .map(i => ({ item: i, count: wearData.counts[i.id] || 0, lastWorn: wearData.lastDates[i.id] }))
+            .filter(c => c.count <= threshold)
             .sort((a, b) => a.count - b.count || (a.lastWorn || "0").localeCompare(b.lastWorn || "0"))
             .slice(0, 5);
           if (available.length === 0) return null;
