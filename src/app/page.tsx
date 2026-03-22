@@ -507,6 +507,8 @@ JSON 배열만 반환:
 
   const [ootdSaving, setOotdSaving] = useState(false);
   const [ootdMemo, setOotdMemo] = useState("");
+  const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
+  const [editingMemoText, setEditingMemoText] = useState("");
 
   const saveOotdRecord = async () => {
     if (!ootdResult || ootdResult.items.length === 0) return;
@@ -549,6 +551,12 @@ JSON 배열만 반환:
 
   const deleteOotdLog = async (id: string) => {
     await supabase.from("ootd_logs").delete().eq("id", id);
+    fetchData();
+  };
+
+  const saveOotdMemo = async (id: string, memo: string) => {
+    await supabase.from("ootd_logs").update({ memo: memo.trim() || null }).eq("id", id);
+    setEditingMemoId(null);
     fetchData();
   };
 
@@ -632,7 +640,19 @@ JSON 배열만 반환:
                 </div>
               )}
               <div style={{ fontSize: 12, color: "#555", marginBottom: 6, lineHeight: 1.5 }}>{log.description}</div>
-              {log.memo && <div style={{ fontSize: 11, color: "#888", marginBottom: 6, fontStyle: "italic", lineHeight: 1.5 }}>{log.memo}</div>}
+              {editingMemoId === log.id ? (
+                <div style={{ marginBottom: 6 }}>
+                  <textarea value={editingMemoText} onChange={e => setEditingMemoText(e.target.value)} rows={2} autoFocus style={{ width: "100%", padding: "6px 10px", borderRadius: 8, border: "1.5px solid rgba(107,45,62,0.2)", fontSize: 11, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", boxSizing: "border-box", resize: "vertical" }} />
+                  <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                    <button onClick={() => saveOotdMemo(log.id, editingMemoText)} style={{ fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "none", background: "#6B2D3E", color: "#fff", cursor: "pointer", fontFamily: "inherit" }}>저장</button>
+                    <button onClick={() => setEditingMemoId(null)} style={{ fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", color: "#888", cursor: "pointer", fontFamily: "inherit" }}>취소</button>
+                  </div>
+                </div>
+              ) : log.memo ? (
+                <div onClick={() => { setEditingMemoId(log.id); setEditingMemoText(log.memo || ""); }} style={{ fontSize: 11, color: "#888", marginBottom: 6, fontStyle: "italic", lineHeight: 1.5, cursor: "pointer" }}>{log.memo}</div>
+              ) : (
+                <button onClick={() => { setEditingMemoId(log.id); setEditingMemoText(""); }} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px dashed rgba(0,0,0,0.12)", background: "transparent", color: "#aaa", cursor: "pointer", fontFamily: "inherit", marginBottom: 6 }}>+ 메모</button>
+              )}
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {log.items.map(id => { const item = getItem(id); if (!item) return null; return <span key={id} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 16, background: "rgba(0,0,0,0.06)", color: "#555" }}>{item.name}</span>; })}
               </div>
