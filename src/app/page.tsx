@@ -1098,7 +1098,7 @@ ${wardrobeSummary}
     <div style={{ minHeight: "100vh", maxWidth: 480, margin: "0 auto" }}>
       <input ref={itemImageInputRef} type="file" accept="image/*" onChange={handleItemImageUpload} style={{ display: "none" }} />
       <div style={{ padding: "24px 20px 16px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.5px", color: "#2A2A2A" }}>내옷 myot</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.5px", color: "#2A2A2A" }}>내<span style={{ color: "#6B2D3E" }}>옷</span> myot</h1>
         <p style={{ fontSize: 11, color: "#999", margin: "4px 0 0", letterSpacing: "2px", textTransform: "uppercase" }}>my only trend</p>
       </div>
       <div style={{ display: "flex", padding: "0 8px", borderBottom: "1px solid rgba(0,0,0,0.06)", background: "rgba(255,255,255,0.3)", overflowX: "auto" }}>
