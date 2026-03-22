@@ -285,7 +285,7 @@ export default function Home() {
   const [weatherLoading, setWeatherLoading] = useState(false);
 
   // 비움 state
-  const [letgoItems, setLetgoItems] = useLocalStorage<{ id: string; reason?: string; addedAt: string }[]>("myot-letgo", []);
+  const [letgoItems, setLetgoItems] = useState<{ dbId: string; id: string; reason?: string; addedAt: string }[]>([]);
   const [letgoAdding, setLetgoAdding] = useState(false);
   const [letgoSearch, setLetgoSearch] = useState("");
 
@@ -328,12 +328,13 @@ export default function Home() {
 
   // ─── Fetch data from Supabase ──────────────────────────────────
   const fetchData = useCallback(async () => {
-    const [itemsRes, combosRes, wishRes, ootdRes, statusRes] = await Promise.all([
+    const [itemsRes, combosRes, wishRes, ootdRes, statusRes, letgoRes] = await Promise.all([
       supabase.from("clothing_items").select("*").order("id"),
       supabase.from("combos").select("*"),
       supabase.from("wish_items").select("*").order("created_at"),
       supabase.from("ootd_logs").select("*").order("created_at", { ascending: false }),
       supabase.from("wish_statuses").select("*").order("sort_order"),
+      supabase.from("letgo_items").select("*").order("created_at"),
     ]);
     if (itemsRes.data) setAllItems(itemsRes.data.map((r: Record<string, unknown>) => ({
       id: r.id as string, cat: r.cat as CategoryKey, name: r.name as string, brand: r.brand as string | undefined,
@@ -352,6 +353,9 @@ export default function Home() {
       description: (r.description as string) || "", image_url: r.image_url as string | undefined, memo: (r.memo as string) || undefined,
     })));
     if (statusRes.data) setWishStatuses(statusRes.data as { id: string; label: string; color: string }[]);
+    if (letgoRes.data) setLetgoItems(letgoRes.data.map((r: Record<string, unknown>) => ({
+      dbId: r.id as string, id: r.item_id as string, reason: (r.reason as string) || undefined, addedAt: (r.added_at as string) || "",
+    })));
     setLoading(false);
   }, []);
 
@@ -1409,7 +1413,7 @@ ${wardrobeSummary}
                         {wearData.counts[l.id] ? ` · ${wearData.counts[l.id]}회 착용` : " · 착용 기록 없음"}
                       </div>
                     </div>
-                    <button onClick={() => setLetgoItems(letgoItems.filter(x => x.id !== l.id))} style={{ border: "none", background: "transparent", color: "#CCC", cursor: "pointer", fontSize: 14, padding: "0 4px" }}>✕</button>
+                    <button onClick={async () => { await supabase.from("letgo_items").delete().eq("id", l.dbId); fetchData(); }} style={{ border: "none", background: "transparent", color: "#CCC", cursor: "pointer", fontSize: 14, padding: "0 4px" }}>✕</button>
                   </div>
                 );
               })}
@@ -1422,9 +1426,10 @@ ${wardrobeSummary}
             <input value={letgoSearch} onChange={e => setLetgoSearch(e.target.value)} placeholder="아이템 검색..." style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 12, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
             <div style={{ maxHeight: 300, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
               {filtered.map(item => (
-                <ItemCard key={item.id} item={item} compact onClick={() => {
+                <ItemCard key={item.id} item={item} compact onClick={async () => {
                   const reason = prompt("비우는 이유 (선택)") || "";
-                  setLetgoItems([...letgoItems, { id: item.id, reason: reason.trim() || undefined, addedAt: new Date().toISOString().split("T")[0] }]);
+                  await supabase.from("letgo_items").insert({ item_id: item.id, reason: reason.trim() || null });
+                  fetchData();
                 }} wearCount={wearData.counts[item.id] || 0} lastWorn={wearData.lastDates[item.id]} />
               ))}
               {filtered.length === 0 && <div style={{ textAlign: "center", padding: 20, color: "#888", fontSize: 12 }}>검색 결과 없음</div>}
