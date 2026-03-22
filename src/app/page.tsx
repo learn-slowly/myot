@@ -133,8 +133,8 @@ const ALL_TAGS = Object.keys(TAG_COLORS) as import("@/data/closet").StyleTag[];
 const ALL_SEASONS: Season[] = ["spring", "summer", "fall", "winter"];
 const ALL_CATS = Object.keys(CATEGORIES) as CategoryKey[];
 
-function ItemEditModal({ item, onSave, onDelete, onClose }: {
-  item: ClothingItem | null; onSave: (item: ClothingItem) => void; onDelete?: (id: string) => void; onClose: () => void;
+function ItemEditModal({ item, onSave, onDelete, onClose, onGenerateCombos }: {
+  item: ClothingItem | null; onSave: (item: ClothingItem) => void; onDelete?: (id: string) => void; onClose: () => void; onGenerateCombos?: (item: ClothingItem) => void;
 }) {
   const isNew = !item;
   const [form, setForm] = useState<ClothingItem>(item || {
@@ -202,7 +202,11 @@ function ItemEditModal({ item, onSave, onDelete, onClose }: {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+        {onGenerateCombos && !isNew && form.cat !== "accessories" && (
+          <button onClick={() => { onGenerateCombos(form); onClose(); }} style={{ width: "100%", marginTop: 16, padding: 12, borderRadius: 10, border: "1.5px dashed rgba(107,45,62,0.2)", background: "rgba(107,45,62,0.03)", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#6B2D3E", fontWeight: 500 }}>AI로 이 아이템 코디 조합 만들기</button>
+        )}
+
+        <div style={{ display: "flex", gap: 8, marginTop: onGenerateCombos && !isNew ? 8 : 20 }}>
           {onDelete && !isNew && (
             <button onClick={() => { if (confirm("이 아이템을 삭제할까요?")) onDelete(form.id); }} style={{ padding: "12px 16px", borderRadius: 10, border: "1.5px solid rgba(232,93,93,0.3)", background: "transparent", color: "#E85D5D", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>삭제</button>
           )}
@@ -286,12 +290,77 @@ export default function Home() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   // ─── Item CRUD ──────────────────────────────────────────────────
+  const [generatingCombos, setGeneratingCombos] = useState(false);
+
+  const generateCombosForItem = async (item: ClothingItem) => {
+    setGeneratingCombos(true);
+    try {
+      // 최신 아이템 목록을 DB에서 다시 가져옴
+      const { data: freshItems } = await supabase.from("clothing_items").select("*").order("id");
+      if (!freshItems) return;
+
+      const items = freshItems as { id: string; cat: string; name: string; color?: string; brand?: string; season?: string[]; tags?: string[] }[];
+      const itemList = items.filter(i => i.cat !== "accessories").map(i =>
+        `${i.id}: ${i.name}${i.color ? ` (${i.color})` : ""}${i.brand ? ` [${i.brand}]` : ""} — ${CATEGORIES[i.cat as CategoryKey] || i.cat}${i.season?.length ? ` [${i.season.map(s => SEASONS[s as Season] || s).join("/")}]` : ""}`
+      ).join("\n");
+
+      const prompt = `새 아이템이 옷장에 추가됐어:
+${item.id}: ${item.name}${item.color ? ` (${item.color})` : ""}${item.brand ? ` [${item.brand}]` : ""} — ${CATEGORIES[item.cat]}${item.season?.length ? ` [${item.season.map(s => SEASONS[s]).join("/")}]` : ""}
+
+현재 옷장 전체:
+${itemList}
+
+이 새 아이템을 포함하는 코디 조합을 만들어줘.
+
+규칙:
+- 각 조합은 하의 1개 + 상의 여러개 + 아우터 여러개 + 신발 여러개
+- 시즌별로 완전 분리 (겨울 아우터와 여름 상의 섞지 않기)
+- 새 아이템의 시즌에 맞는 조합만
+- 현실적으로 어울리는 조합만
+- 최대 5개 조합
+
+JSON 배열만 반환:
+[{"bottom":"id","tops":["id",...],"outers":["id",...],"shoes":["id",...],"mood":["casual"/"neat"/"cool"/"formal"],"season":["spring"/"summer"/"fall"/"winter"],"description":"한국어 조합 설명"}]`;
+
+      const res = await fetch("/api/analyze-text", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const text = data.content?.map((c: { text?: string }) => c.text || "").join("") || "";
+      const clean = text.replace(/```json|```/g, "").trim();
+      const newCombos = JSON.parse(clean);
+
+      if (Array.isArray(newCombos) && newCombos.length > 0) {
+        const rows = newCombos.map((c: { bottom: string; tops: string[]; outers: string[]; shoes: string[]; mood: string[]; season: string[]; description: string }) => ({
+          bottom: c.bottom,
+          tops: c.tops || [],
+          outers: c.outers || [],
+          shoes: c.shoes || [],
+          mood: c.mood || ["casual"],
+          season: c.season || [],
+          description: c.description || "",
+        }));
+        await supabase.from("combos").insert(rows);
+        fetchData();
+      }
+    } catch (err) {
+      console.error("Combo generation error:", err);
+    }
+    setGeneratingCombos(false);
+  };
+
   const saveItem = async (item: ClothingItem) => {
+    const isNew = item.id.startsWith("custom-");
     const row = { id: item.id, cat: item.cat, name: item.name, brand: item.brand || null, color: item.color || null, season: item.season || [], tags: item.tags, note: item.note || null };
     await supabase.from("clothing_items").upsert(row);
     setEditingItem(null);
     setAddingItem(false);
     fetchData();
+    if (isNew && item.cat !== "accessories") {
+      generateCombosForItem(item);
+    }
   };
 
   const deleteItem = async (id: string) => {
@@ -572,6 +641,7 @@ export default function Home() {
   const renderCloset = () => (
     <div>
       {imageUploading && <div style={{ padding: "8px 16px", marginBottom: 12, borderRadius: 10, background: "rgba(196,149,43,0.1)", border: "1px solid rgba(196,149,43,0.2)", fontSize: 12, color: "#C4952B", textAlign: "center" }}>사진 업로드 중...</div>}
+      {generatingCombos && <div style={{ padding: "8px 16px", marginBottom: 12, borderRadius: 10, background: "rgba(107,45,62,0.08)", border: "1px solid rgba(107,45,62,0.15)", fontSize: 12, color: "#6B2D3E", textAlign: "center" }}>AI가 새 아이템으로 코디 조합 만드는 중...</div>}
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         <Pill label="전체" active={closetFilter === "all"} onClick={() => setClosetFilter("all")} />
         {Object.entries(SEASONS).map(([k, v]) => <Pill key={k} label={v} active={closetFilter === k} onClick={() => setClosetFilter(k as Season)} count={allItems.filter(i => i.season?.includes(k as Season)).length} />)}
@@ -921,6 +991,7 @@ ${wardrobeSummary}
           onSave={saveItem}
           onDelete={editingItem ? deleteItem : undefined}
           onClose={() => { setEditingItem(null); setAddingItem(false); }}
+          onGenerateCombos={editingItem ? generateCombosForItem : undefined}
         />
       )}
     </div>
