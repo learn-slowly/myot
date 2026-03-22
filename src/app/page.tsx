@@ -229,6 +229,10 @@ export default function Home() {
   const [newWish, setNewWish] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Weather state
+  const [weather, setWeather] = useState<{ temp: number; desc: string; icon: string } | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+
   // OOTD state
   const [ootdImage, setOotdImage] = useState<string | null>(null);
   const [ootdAnalyzing, setOotdAnalyzing] = useState(false);
@@ -292,6 +296,50 @@ export default function Home() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ─── Weather (Open-Meteo) ───────────────────────────────────────
+  useEffect(() => {
+    const fetchWeather = async (lat: number, lon: number) => {
+      setWeatherLoading(true);
+      try {
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`);
+        const data = await res.json();
+        const temp = Math.round(data.current.temperature_2m);
+        const code = data.current.weather_code as number;
+        // WMO weather code → description + icon
+        const weatherMap: Record<number, [string, string]> = {
+          0: ["맑음", "☀️"], 1: ["대체로 맑음", "🌤"], 2: ["구름 조금", "⛅"], 3: ["흐림", "☁️"],
+          45: ["안개", "🌫"], 48: ["안개", "🌫"],
+          51: ["이슬비", "🌦"], 53: ["이슬비", "🌦"], 55: ["이슬비", "🌦"],
+          61: ["비", "🌧"], 63: ["비", "🌧"], 65: ["폭우", "🌧"],
+          71: ["눈", "🌨"], 73: ["눈", "🌨"], 75: ["폭설", "🌨"],
+          80: ["소나기", "🌦"], 81: ["소나기", "🌦"], 82: ["소나기", "🌦"],
+          95: ["뇌우", "⛈"], 96: ["뇌우+우박", "⛈"], 99: ["뇌우+우박", "⛈"],
+        };
+        const [desc, icon] = weatherMap[code] || ["맑음", "☀️"];
+        setWeather({ temp, desc, icon });
+        localStorage.setItem("myot-coords", JSON.stringify({ lat, lon }));
+      } catch { setWeather(null); }
+      setWeatherLoading(false);
+    };
+
+    // 캐싱된 좌표 확인
+    const cached = localStorage.getItem("myot-coords");
+    if (cached) {
+      const { lat, lon } = JSON.parse(cached);
+      fetchWeather(lat, lon);
+    }
+
+    // 위치 가져오기
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+        () => { if (!cached) fetchWeather(37.5665, 126.978); } // 서울 기본값
+      );
+    } else if (!cached) {
+      fetchWeather(37.5665, 126.978);
+    }
+  }, []);
 
   // ─── Item CRUD ──────────────────────────────────────────────────
   const [generatingCombos, setGeneratingCombos] = useState(false);
@@ -785,20 +833,70 @@ JSON 배열만 반환:
     );
   };
 
-  // ─── MOOD ─────────────────────────────────────────────────────
+  // ─── MOOD (날씨 연동) ─────────────────────────────────────────
   const renderMood = () => {
-    const filtered = combos.filter(c => c.season.includes(activeSeason) && (!selectedMood || c.mood.includes(selectedMood)));
-    const shuffled = [...filtered].sort(() => Math.random() - 0.5).slice(0, 3);
+    // 기온 → 시즌 자동 판단
+    const weatherSeason: Season | null = weather ? (
+      weather.temp >= 25 ? "summer" :
+      weather.temp >= 15 ? (new Date().getMonth() < 6 ? "spring" : "fall") :
+      "winter"
+    ) : null;
+    const moodSeason = selectedSeason || weatherSeason || getCurrentSeason();
+    const isRainy = weather && (weather.desc.includes("비") || weather.desc.includes("소나기") || weather.desc.includes("뇌우") || weather.desc.includes("이슬비"));
+
+    const filtered = combos.filter(c => c.season.includes(moodSeason) && (!selectedMood || c.mood.includes(selectedMood)));
+
+    // 비 오면 비 관련 신발 우선 정렬
+    let sorted = [...filtered];
+    if (isRainy) {
+      sorted.sort((a, b) => {
+        const aRain = a.shoes.some(s => { const item = getItem(s); return item?.note?.includes("비") || item?.name?.includes("장화"); });
+        const bRain = b.shoes.some(s => { const item = getItem(s); return item?.note?.includes("비") || item?.name?.includes("장화"); });
+        return (bRain ? 1 : 0) - (aRain ? 1 : 0);
+      });
+    }
+
+    // 최근 안 입은 옷 우선
+    const recentItems = new Set(ootdLogs.slice(0, 5).flatMap(l => l.items));
+    sorted.sort((a, b) => {
+      const aRecent = [a.bottom, ...a.tops].filter(id => recentItems.has(id)).length;
+      const bRecent = [b.bottom, ...b.tops].filter(id => recentItems.has(id)).length;
+      return aRecent - bRecent;
+    });
+
+    const shuffled = sorted.slice(0, 3);
+
     return (
       <div key={refreshKey}>
+        {/* 날씨 카드 */}
+        {weather && (
+          <div style={{ background: "rgba(255,255,255,0.7)", borderRadius: 14, padding: "16px 20px", marginBottom: 16, border: "1px solid rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: 14 }}>
+            <span style={{ fontSize: 36 }}>{weather.icon}</span>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: "#2A2A2A" }}>{weather.temp}°C</div>
+              <div style={{ fontSize: 12, color: "#888" }}>{weather.desc} · {SEASONS[moodSeason]} 옷차림 추천</div>
+            </div>
+          </div>
+        )}
+        {weatherLoading && <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>날씨 확인 중...</div>}
+
         <div style={{ fontSize: 13, fontWeight: 600, color: "#2A2A2A", marginBottom: 10 }}>오늘 기분은?</div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
           {Object.entries(MOODS).map(([k, v]) => <button key={k} onClick={() => { setSelectedMood(selectedMood === k ? null : k as Mood); setRefreshKey(r => r + 1); }} style={{ padding: "10px 20px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", background: selectedMood === k ? "#2A2A2A" : "rgba(255,255,255,0.7)", color: selectedMood === k ? "#F5F0E1" : "#555", fontWeight: 500, fontSize: 14, boxShadow: "0 1px 3px rgba(0,0,0,0.06)", transition: "all 0.2s" }}>{v}</button>)}
         </div>
-        <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
-          {Object.entries(SEASONS).map(([k, v]) => <Pill key={k} label={v} active={activeSeason === k} onClick={() => { setSelectedSeason(k as Season); setRefreshKey(r => r + 1); }} />)}
+
+        {/* 시즌 수동 오버라이드 */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: 11, color: "#888", marginRight: 4 }}>시즌:</span>
+          {Object.entries(SEASONS).map(([k, v]) => <Pill key={k} label={v} active={moodSeason === k} onClick={() => { setSelectedSeason(k as Season); setRefreshKey(r => r + 1); }} />)}
+          {selectedSeason && <button onClick={() => { setSelectedSeason(null); setRefreshKey(r => r + 1); }} style={{ fontSize: 11, color: "#888", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}>자동으로</button>}
         </div>
-        <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>{SEASONS[activeSeason]} · {selectedMood ? MOODS[selectedMood] : "전체"} — {filtered.length}개 조합</div>
+
+        <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>
+          {SEASONS[moodSeason]} · {selectedMood ? MOODS[selectedMood] : "전체"} — {filtered.length}개 조합
+          {isRainy && <span style={{ marginLeft: 6, color: "#5A7BA0" }}>🌧 비 오는 날 추천</span>}
+        </div>
+
         {shuffled.map((combo) => {
           const bottom = getItem(combo.bottom);
           return (
