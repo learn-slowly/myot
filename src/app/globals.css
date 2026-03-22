@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #F5F0E1;
+  --color-sand: #E8E0D0;
+  --color-warm-bg: #DED5C4;
+  --color-text: #2A2A2A;
+  --color-text-light: #888888;
+  --color-burgundy: #6B2D3E;
+  --color-navy: #2C3E6B;
+  --color-khaki: #6B6B42;
+  --color-gold: #C4952B;
+  --color-ivy: #5A7BA0;
+  --font-sans: 'Pretendard Variable', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: linear-gradient(160deg, var(--color-cream) 0%, var(--color-sand) 40%, var(--color-warm-bg) 100%);
+  color: var(--color-text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* PWA standalone mode */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

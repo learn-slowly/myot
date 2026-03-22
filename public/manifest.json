@@ -1,0 +1,21 @@
+{
+  "name": "내옷 myot",
+  "short_name": "myot",
+  "description": "워크웨어 · 아이비 · 캐주얼 코디 앱",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F0E1",
+  "theme_color": "#F5F0E1",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
