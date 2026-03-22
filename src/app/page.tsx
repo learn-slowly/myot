@@ -750,8 +750,8 @@ JSON 배열만 반환:
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>{combo.mood.map(m => <span key={m} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: "rgba(0,0,0,0.06)", color: "#555" }}>{MOODS[m as Mood] || m}</span>)}</div>
                 <div style={{ fontSize: 12, color: "#555", lineHeight: 1.8 }}>
                   <div><strong>하의:</strong> {getItem(combo.bottom)?.name}</div>
-                  <div><strong>상의:</strong> {combo.tops.map(t => getItem(t)?.name).filter(Boolean).join(" / ")}</div>
-                  <div><strong>아우터:</strong> {combo.outers.map(t => getItem(t)?.name).filter(Boolean).join(" / ")}</div>
+                  <div><strong>상의:</strong> {(sel.top ? [sel.top] : combo.tops).map(t => getItem(t)?.name).filter(Boolean).join(" / ")}</div>
+                  <div><strong>아우터:</strong> {(sel.outer ? [sel.outer] : combo.outers).map(t => getItem(t)?.name).filter(Boolean).join(" / ")}</div>
                   <div><strong>신발:</strong> {combo.shoes.map(t => getItem(t)?.name).filter(Boolean).join(" / ")}</div>
                 </div>
               </div>
