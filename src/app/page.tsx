@@ -215,7 +215,23 @@ function ItemEditModal({ item, onSave, onDelete, onClose, onGenerateCombos, cust
 
           <div style={{ display: "flex", gap: 8 }}>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>구매일</label>
+              <label style={labelStyle}>사이즈</label>
+              <input value={form.size || ""} onChange={e => setForm({ ...form, size: e.target.value || undefined })} style={fieldStyle} placeholder="M, 32, 270 등" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>입수 경로</label>
+              <select value={form.acquired_via || ""} onChange={e => setForm({ ...form, acquired_via: e.target.value || undefined })} style={fieldStyle}>
+                <option value="">선택 안 함</option>
+                <option value="new">새옷 구매</option>
+                <option value="gift">선물</option>
+                <option value="used">중고구매</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>산/받은 날짜</label>
               <input type="date" value={form.purchased_at || ""} onChange={e => setForm({ ...form, purchased_at: e.target.value || undefined })} style={fieldStyle} />
             </div>
             <div style={{ flex: 1 }}>
@@ -435,7 +451,7 @@ JSON 배열만 반환:
 
   const saveItem = async (item: ClothingItem) => {
     const isNew = item.id.startsWith("custom-");
-    const row = { id: item.id, cat: item.cat, name: item.name, brand: item.brand || null, color: item.color || null, season: item.season || [], tags: item.tags, note: item.note || null, purchased_at: item.purchased_at || null, last_cleaned_at: item.last_cleaned_at || null };
+    const row = { id: item.id, cat: item.cat, name: item.name, brand: item.brand || null, color: item.color || null, season: item.season || [], tags: item.tags, note: item.note || null, purchased_at: item.purchased_at || null, last_cleaned_at: item.last_cleaned_at || null, acquired_via: item.acquired_via || null, size: item.size || null };
     await supabase.from("clothing_items").upsert(row);
     setEditingItem(null);
     setAddingItem(false);

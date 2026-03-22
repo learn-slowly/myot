@@ -17,6 +17,8 @@ export interface ClothingItem {
   image_url?: string;
   purchased_at?: string;
   last_cleaned_at?: string;
+  acquired_via?: string;
+  size?: string;
 }
 
 export interface Combo {
