@@ -18,6 +18,8 @@ export interface ClothingItem {
   tags: StyleTag[];
   note?: string;
   image_url?: string;
+  purchased_at?: string;
+  last_cleaned_at?: string;
 }
 
 export interface Combo {

@@ -197,6 +197,17 @@ function ItemEditModal({ item, onSave, onDelete, onClose, onGenerateCombos }: {
             </div>
           </div>
 
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>구매일</label>
+              <input type="date" value={form.purchased_at || ""} onChange={e => setForm({ ...form, purchased_at: e.target.value || undefined })} style={fieldStyle} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>마지막 세탁</label>
+              <input type="date" value={form.last_cleaned_at || ""} onChange={e => setForm({ ...form, last_cleaned_at: e.target.value || undefined })} style={fieldStyle} />
+            </div>
+          </div>
+
           <div>
             <label style={labelStyle}>메모</label>
             <input value={form.note || ""} onChange={e => setForm({ ...form, note: e.target.value || undefined })} style={fieldStyle} placeholder="덕 캔버스, 크롭 수선" />
@@ -406,7 +417,7 @@ JSON 배열만 반환:
 
   const saveItem = async (item: ClothingItem) => {
     const isNew = item.id.startsWith("custom-");
-    const row = { id: item.id, cat: item.cat, name: item.name, brand: item.brand || null, color: item.color || null, season: item.season || [], tags: item.tags, note: item.note || null };
+    const row = { id: item.id, cat: item.cat, name: item.name, brand: item.brand || null, color: item.color || null, season: item.season || [], tags: item.tags, note: item.note || null, purchased_at: item.purchased_at || null, last_cleaned_at: item.last_cleaned_at || null };
     await supabase.from("clothing_items").upsert(row);
     setEditingItem(null);
     setAddingItem(false);
