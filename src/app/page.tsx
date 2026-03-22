@@ -235,6 +235,7 @@ export default function Home() {
   const [ootdResult, setOotdResult] = useState<{ items: string[]; description: string } | null>(null);
   const [ootdStatsView, setOotdStatsView] = useState(false);
   const [ootdAddPicker, setOotdAddPicker] = useState(false);
+  const [ootdSearchQuery, setOotdSearchQuery] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Supabase data
@@ -421,10 +422,10 @@ JSON 배열만 반환:
   };
 
   const buildAnalysisPrompt = () => {
-    const itemList = clothingItems.map(i =>
+    const itemList = allItems.map(i =>
       `${i.id}: ${i.name}${i.color ? ` (${i.color})` : ''}${i.brand ? ` [${i.brand}]` : ''} — ${CATEGORIES[i.cat]}`
     ).join('\n');
-    return `You are analyzing an OOTD (outfit of the day) photo. The person's wardrobe contains these items:\n\n${itemList}\n\nAnalyze the photo and identify which items from the wardrobe the person is wearing. Return ONLY a JSON object with no other text, in this exact format:\n{"items": ["id1", "id2", ...], "description": "Brief Korean description of the outfit"}\n\nRules:\n- Only use item IDs from the list above\n- Pick the closest matching items\n- Include: bottom, top, outer (if visible), shoes (if visible)\n- description should be 1-2 sentences in Korean describing the overall look`;
+    return `You are analyzing an OOTD (outfit of the day) photo. The person's wardrobe contains these items:\n\n${itemList}\n\nAnalyze the photo and identify which items from the wardrobe the person is wearing. Return ONLY a JSON object with no other text, in this exact format:\n{"items": ["id1", "id2", ...], "description": "Brief Korean description of the outfit"}\n\nRules:\n- Only use item IDs from the list above\n- Pick the closest matching items\n- Include: bottom, top, outer (if visible), shoes (if visible), accessories (glasses, tie, bag, watch if visible)\n- description should be 1-2 sentences in Korean describing the overall look`;
   };
 
   const analyzeOotd = async () => {
@@ -442,7 +443,7 @@ JSON 배열만 반환:
       const text = data.content?.map((c: { text?: string }) => c.text || "").join("") || "";
       const clean = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean);
-      const validItems = (parsed.items || []).filter((id: string) => clothingItems.some(i => i.id === id));
+      const validItems = (parsed.items || []).filter((id: string) => allItems.some(i => i.id === id));
       setOotdResult({ items: validItems, description: parsed.description || "" });
     } catch (err) {
       console.error("Analysis error:", err);
@@ -615,13 +616,17 @@ JSON 배열만 반환:
               </div>
               {ootdAddPicker ? (
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>아이템 추가 (탭하여 선택)</div>
-                  <div style={{ maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-                    {clothingItems.filter(i => !ootdResult.items.includes(i.id)).map(item => (
+                  <input value={ootdSearchQuery} onChange={e => setOotdSearchQuery(e.target.value)} placeholder="아이템 검색..." style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 12, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
+                  <div style={{ maxHeight: 240, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+                    {allItems.filter(i => !ootdResult.items.includes(i.id)).filter(i => {
+                      if (!ootdSearchQuery.trim()) return true;
+                      const q = ootdSearchQuery.toLowerCase();
+                      return i.name.toLowerCase().includes(q) || (i.brand || "").toLowerCase().includes(q) || (i.color || "").toLowerCase().includes(q) || CATEGORIES[i.cat].includes(q);
+                    }).map(item => (
                       <ItemCard key={item.id} item={item} compact onClick={() => setOotdResult({ ...ootdResult, items: [...ootdResult.items, item.id] })} />
                     ))}
                   </div>
-                  <button onClick={() => setOotdAddPicker(false)} style={{ marginTop: 8, width: "100%", padding: 8, borderRadius: 8, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888" }}>닫기</button>
+                  <button onClick={() => { setOotdAddPicker(false); setOotdSearchQuery(""); }} style={{ marginTop: 8, width: "100%", padding: 8, borderRadius: 8, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888" }}>닫기</button>
                 </div>
               ) : (
                 <button onClick={() => setOotdAddPicker(true)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1.5px dashed rgba(0,0,0,0.12)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888", marginBottom: 12 }}>+ 아이템 추가/수정</button>
