@@ -66,6 +66,7 @@ function ItemCard({
 }: {
   item: ClothingItem; compact?: boolean; onClick?: () => void; selected?: boolean; onRemove?: () => void;
   imageUrl?: string; onAddPhoto?: () => void; onRemovePhoto?: () => void; onEdit?: () => void;
+  wearCount?: number; lastWorn?: string;
 }) {
   return (
     <button
@@ -91,6 +92,11 @@ function ItemCard({
         </div>
         {!compact && item.brand && (
           <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{item.brand}</div>
+        )}
+        {!compact && wearCount !== undefined && (
+          <div style={{ fontSize: 10, color: lastWorn ? "#888" : "#C4952B", marginTop: 2 }}>
+            {wearCount > 0 ? `${wearCount}회 착용${lastWorn ? ` · 마지막 ${lastWorn}` : ""}` : "아직 안 입음"}
+          </div>
         )}
       </div>
       {onRemove && (
@@ -780,6 +786,19 @@ JSON 배열만 반환:
   // ─── CLOSET ───────────────────────────────────────────────────
   const [showClosetStats, setShowClosetStats] = useState(false);
 
+  // 착용 빈도 계산
+  const wearData = (() => {
+    const counts: Record<string, number> = {};
+    const lastDates: Record<string, string> = {};
+    ootdLogs.forEach(log => {
+      log.items.forEach(id => {
+        counts[id] = (counts[id] || 0) + 1;
+        if (!lastDates[id] || log.date > lastDates[id]) lastDates[id] = log.date;
+      });
+    });
+    return { counts, lastDates };
+  })();
+
   const renderClosetStats = () => {
     const now = new Date();
     const curSeason = getCurrentSeason();
@@ -803,12 +822,6 @@ JSON 배열만 반환:
     const byCat: Record<string, number> = {};
     allItems.forEach(i => { const label = allCats[i.cat] || i.cat; byCat[label] = (byCat[label] || 0) + 1; });
     const topCats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-    const needsCleaning = allItems.filter(i => {
-      if (!i.last_cleaned_at) return false;
-      const diff = (now.getTime() - new Date(i.last_cleaned_at).getTime()) / (1000 * 60 * 60 * 24);
-      return diff > 90;
-    });
 
     const statBox = { background: "rgba(255,255,255,0.7)", borderRadius: 12, padding: "12px 16px", border: "1px solid rgba(0,0,0,0.06)" } as const;
     const statNum = { fontSize: 22, fontWeight: 700, color: "#6B2D3E" } as const;
@@ -853,14 +866,54 @@ JSON 배열만 반환:
           </div>
         </div>
 
-        {needsCleaning.length > 0 && (
-          <div style={{ ...statBox, borderColor: "rgba(196,149,43,0.3)" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#C4952B", marginBottom: 6 }}>세탁 필요 (90일 경과)</div>
-            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-              {needsCleaning.map(i => <span key={i.id} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 16, background: "rgba(196,149,43,0.1)", color: "#C4952B" }}>{i.name}</span>)}
-            </div>
-          </div>
-        )}
+        {(() => {
+          const neverWorn = allItems.filter(i => !wearData.counts[i.id]);
+          const mostWorn = allItems.filter(i => wearData.counts[i.id]).sort((a, b) => (wearData.counts[b.id] || 0) - (wearData.counts[a.id] || 0)).slice(0, 5);
+          const longUnworn = allItems.filter(i => {
+            const last = wearData.lastDates[i.id];
+            if (!last) return false;
+            return (now.getTime() - new Date(last).getTime()) / (1000 * 60 * 60 * 24) > 60;
+          }).sort((a, b) => (wearData.lastDates[a.id] || "").localeCompare(wearData.lastDates[b.id] || ""));
+
+          return <>
+            {mostWorn.length > 0 && (
+              <div style={{ ...statBox, marginBottom: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A", marginBottom: 6 }}>자주 입는 옷 TOP 5</div>
+                {mostWorn.map(i => (
+                  <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, color: "#555", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.name}</span>
+                    <div style={{ flex: 1.5, height: 6, borderRadius: 3, background: "rgba(0,0,0,0.06)", overflow: "hidden" }}>
+                      <div style={{ width: `${(wearData.counts[i.id] / (wearData.counts[mostWorn[0].id] || 1)) * 100}%`, height: "100%", borderRadius: 3, background: "#6B2D3E" }} />
+                    </div>
+                    <span style={{ fontSize: 11, color: "#888", minWidth: 30, textAlign: "right" }}>{wearData.counts[i.id]}회</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {longUnworn.length > 0 && (
+              <div style={{ ...statBox, marginBottom: 8, borderColor: "rgba(196,149,43,0.3)" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#C4952B", marginBottom: 6 }}>60일 넘게 안 입은 옷</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {longUnworn.map(i => {
+                    const days = Math.floor((now.getTime() - new Date(wearData.lastDates[i.id]).getTime()) / (1000 * 60 * 60 * 24));
+                    return <span key={i.id} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 16, background: "rgba(196,149,43,0.1)", color: "#C4952B" }}>{i.name} ({days}일)</span>;
+                  })}
+                </div>
+              </div>
+            )}
+
+            {neverWorn.length > 0 && (
+              <div style={{ ...statBox, borderColor: "rgba(0,0,0,0.1)" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#888", marginBottom: 6 }}>아직 안 입은 옷 ({neverWorn.length})</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {neverWorn.slice(0, 15).map(i => <span key={i.id} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 16, background: "rgba(0,0,0,0.04)", color: "#888" }}>{i.name}</span>)}
+                  {neverWorn.length > 15 && <span style={{ fontSize: 10, color: "#aaa" }}>+{neverWorn.length - 15}개</span>}
+                </div>
+              </div>
+            )}
+          </>;
+        })()}
       </div>
     );
   };
@@ -897,7 +950,7 @@ JSON 배열만 반환:
                   <span style={{ fontSize: 12, color: "#888" }}>{items.length}개 {isOpen ? "▲" : "▼"}</span>
                 </button>
                 {isOpen && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
-                  {items.map(i => <ItemCard key={i.id} item={i} imageUrl={i.image_url} onEdit={() => setEditingItem(i)} onAddPhoto={() => { setImageTargetId(i.id); itemImageInputRef.current?.click(); }} onRemovePhoto={() => { supabase.from("clothing_items").update({ image_url: null }).eq("id", i.id).then(() => fetchData()); }} />)}
+                  {items.map(i => <ItemCard key={i.id} item={i} imageUrl={i.image_url} onEdit={() => setEditingItem(i)} onAddPhoto={() => { setImageTargetId(i.id); itemImageInputRef.current?.click(); }} onRemovePhoto={() => { supabase.from("clothing_items").update({ image_url: null }).eq("id", i.id).then(() => fetchData()); }} wearCount={wearData.counts[i.id] || 0} lastWorn={wearData.lastDates[i.id]} />)}
                 </div>}
               </div>
             );
@@ -923,7 +976,7 @@ JSON 배열만 반환:
                   <span style={{ fontSize: 12, color: "#888" }}>{items.length}개 {isOpen ? "▲" : "▼"}</span>
                 </button>
                 {isOpen && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
-                  {items.sort((a, b) => (b.purchased_at || "").localeCompare(a.purchased_at || "")).map(i => <ItemCard key={i.id} item={i} imageUrl={i.image_url} onEdit={() => setEditingItem(i)} onAddPhoto={() => { setImageTargetId(i.id); itemImageInputRef.current?.click(); }} onRemovePhoto={() => { supabase.from("clothing_items").update({ image_url: null }).eq("id", i.id).then(() => fetchData()); }} />)}
+                  {items.sort((a, b) => (b.purchased_at || "").localeCompare(a.purchased_at || "")).map(i => <ItemCard key={i.id} item={i} imageUrl={i.image_url} onEdit={() => setEditingItem(i)} onAddPhoto={() => { setImageTargetId(i.id); itemImageInputRef.current?.click(); }} onRemovePhoto={() => { supabase.from("clothing_items").update({ image_url: null }).eq("id", i.id).then(() => fetchData()); }} wearCount={wearData.counts[i.id] || 0} lastWorn={wearData.lastDates[i.id]} />)}
                 </div>}
               </div>
             );
