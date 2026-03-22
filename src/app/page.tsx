@@ -243,6 +243,7 @@ export default function Home() {
   const [combos, setCombos] = useState<DbCombo[]>([]);
   const [wishlist, setWishlist] = useState<WishItem[]>([]);
   const [ootdLogs, setOotdLogs] = useState<OotdLog[]>([]);
+  const [wishStatuses, setWishStatuses] = useState<{ id: string; label: string; color: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   // 살/말 state
@@ -265,11 +266,12 @@ export default function Home() {
 
   // ─── Fetch data from Supabase ──────────────────────────────────
   const fetchData = useCallback(async () => {
-    const [itemsRes, combosRes, wishRes, ootdRes] = await Promise.all([
+    const [itemsRes, combosRes, wishRes, ootdRes, statusRes] = await Promise.all([
       supabase.from("clothing_items").select("*").order("id"),
       supabase.from("combos").select("*"),
       supabase.from("wish_items").select("*").order("created_at"),
       supabase.from("ootd_logs").select("*").order("created_at", { ascending: false }),
+      supabase.from("wish_statuses").select("*").order("sort_order"),
     ]);
     if (itemsRes.data) setAllItems(itemsRes.data.map((r: Record<string, unknown>) => ({
       id: r.id as string, cat: r.cat as CategoryKey, name: r.name as string, brand: r.brand as string | undefined,
@@ -279,12 +281,13 @@ export default function Home() {
     if (combosRes.data) setCombos(combosRes.data as DbCombo[]);
     if (wishRes.data) setWishlist(wishRes.data.map((r: Record<string, unknown>) => ({
       id: r.id as string, name: r.name as string, price: r.price as string | undefined,
-      status: r.status as WishItem["status"], note: (r.note as string) || "", link: r.link as string | undefined,
+      status: r.status as string, note: (r.note as string) || "", link: r.link as string | undefined, image_url: r.image_url as string | undefined,
     })));
     if (ootdRes.data) setOotdLogs(ootdRes.data.map((r: Record<string, unknown>) => ({
       id: r.id as string, date: r.date as string, items: r.items as string[],
       description: (r.description as string) || "", image_url: r.image_url as string | undefined,
     })));
+    if (statusRes.data) setWishStatuses(statusRes.data as { id: string; label: string; color: string }[]);
     setLoading(false);
   }, []);
 
@@ -507,8 +510,16 @@ JSON 배열만 반환:
     setNewWish(""); fetchData();
   };
   const saveWish = async (w: WishItem) => {
-    await supabase.from("wish_items").upsert({ id: w.id, name: w.name, price: w.price || null, status: w.status, note: w.note || "", link: w.link || null });
+    await supabase.from("wish_items").upsert({ id: w.id, name: w.name, price: w.price || null, status: w.status, note: w.note || "", link: w.link || null, image_url: w.image_url || null });
     setEditingWish(null); fetchData();
+  };
+  const addWishStatus = async (label: string) => {
+    const id = label.toLowerCase().replace(/[^a-z0-9가-힣]/g, "_").slice(0, 30) + "_" + Date.now();
+    const colors = ["#6B6B42", "#C47070", "#5A7BA0", "#4A7C59", "#C4952B", "#6B2D3E", "#8E8E8E"];
+    const color = colors[wishStatuses.length % colors.length];
+    await supabase.from("wish_statuses").insert({ id, label, color, sort_order: wishStatuses.length });
+    fetchData();
+    return id;
   };
   const removeWish = async (id: string) => {
     await supabase.from("wish_items").delete().eq("id", id);
@@ -928,22 +939,30 @@ ${wardrobeSummary}
   const renderWishlist = () => {
     const grouped: Record<string, WishItem[]> = {};
     wishlist.forEach(w => { if (!grouped[w.status]) grouped[w.status] = []; grouped[w.status].push(w); });
+    const statusMap = Object.fromEntries(wishStatuses.map(s => [s.id, s]));
+    // 상태 순서: DB 순서 우선, 없는 상태는 뒤에
+    const statusOrder = [...wishStatuses.map(s => s.id), ...Object.keys(grouped).filter(k => !wishStatuses.some(s => s.id === k))];
     return (
       <div>
-        {Object.entries(STATUS_LABELS).map(([st, lb]) => { const its = grouped[st] || []; if (!its.length) return null; return (
+        {statusOrder.map(st => { const its = grouped[st] || []; if (!its.length) return null; const s = statusMap[st]; return (
           <div key={st} style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: STATUS_COLORS[st], marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: STATUS_COLORS[st] }} />{lb} ({its.length})</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: s?.color || "#8E8E8E", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: s?.color || "#8E8E8E" }} />{s?.label || st} ({its.length})</div>
             {its.map(w => (
               <div key={w.id} onClick={() => setEditingWish(w)} style={{ background: "rgba(255,255,255,0.7)", borderRadius: 12, padding: "12px 16px", marginBottom: 6, border: "1px solid rgba(0,0,0,0.06)", cursor: "pointer" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#2A2A2A" }}>{w.name}</div>
-                  <span style={{ fontSize: 11, color: "#B0A090" }}>편집</span>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  {w.image_url && <img src={w.image_url} alt={w.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: "#2A2A2A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.name}</div>
+                      <span style={{ fontSize: 11, color: "#B0A090", flexShrink: 0, marginLeft: 8 }}>편집</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
+                      {w.price && <span style={{ marginRight: 8 }}>{w.price}</span>}
+                      {w.note}
+                    </div>
+                    {w.link && <div style={{ fontSize: 11, marginTop: 2 }}><a href={w.link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: "#5A7BA0", textDecoration: "underline" }}>구매 링크</a></div>}
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>
-                  {w.price && <span style={{ marginRight: 8 }}>{w.price}</span>}
-                  {w.note}
-                </div>
-                {w.link && <div style={{ fontSize: 11, marginTop: 4 }}><a href={w.link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: "#5A7BA0", textDecoration: "underline" }}>구매 링크</a></div>}
               </div>
             ))}
           </div>
@@ -1020,8 +1039,27 @@ ${wardrobeSummary}
       {editingWish && (() => {
         const WishModal = () => {
           const [form, setForm] = useState({ ...editingWish });
+          const [newStatusName, setNewStatusName] = useState("");
+          const [uploading, setUploading] = useState(false);
+          const wishImageRef = useRef<HTMLInputElement>(null);
           const fieldStyle = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 13, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", boxSizing: "border-box" as const };
           const labelStyle = { fontSize: 12, fontWeight: 600 as const, color: "#2A2A2A", marginBottom: 4, display: "block" };
+
+          const handleWishImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            setUploading(true);
+            try {
+              const reader = new FileReader();
+              const base64 = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(file); });
+              const res = await fetch("/api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: base64 }) });
+              const data = await res.json();
+              if (res.ok) setForm({ ...form, image_url: data.url });
+            } catch {}
+            setUploading(false);
+            e.target.value = "";
+          };
+
           return (
             <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={() => setEditingWish(null)}>
               <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto", background: "linear-gradient(160deg, #F5F0E1, #E8E0D0)", borderRadius: "20px 20px 0 0", padding: "20px 16px 32px" }}>
@@ -1029,6 +1067,16 @@ ${wardrobeSummary}
                   <span style={{ fontSize: 16, fontWeight: 700, color: "#2A2A2A" }}>찜 아이템 편집</span>
                   <button onClick={() => setEditingWish(null)} style={{ border: "none", background: "transparent", fontSize: 18, cursor: "pointer", color: "#888" }}>✕</button>
                 </div>
+
+                {/* 이미지 */}
+                <input ref={wishImageRef} type="file" accept="image/*" onChange={handleWishImage} style={{ display: "none" }} />
+                <div onClick={() => wishImageRef.current?.click()} style={{ marginBottom: 12, borderRadius: 12, overflow: "hidden", cursor: "pointer", background: "rgba(0,0,0,0.03)", border: "1.5px dashed rgba(0,0,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: form.image_url ? "auto" : 80 }}>
+                  {uploading ? <span style={{ fontSize: 12, color: "#888", padding: 20 }}>업로드 중...</span>
+                    : form.image_url ? <img src={form.image_url} alt={form.name} style={{ width: "100%", maxHeight: 200, objectFit: "cover", display: "block" }} />
+                    : <span style={{ fontSize: 12, color: "#888", padding: 20 }}>📷 사진 추가</span>}
+                </div>
+                {form.image_url && <button onClick={() => setForm({ ...form, image_url: undefined })} style={{ fontSize: 11, color: "#E85D5D", background: "transparent", border: "none", cursor: "pointer", marginBottom: 8, fontFamily: "inherit" }}>사진 삭제</button>}
+
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   <div>
                     <label style={labelStyle}>이름</label>
@@ -1041,9 +1089,16 @@ ${wardrobeSummary}
                     </div>
                     <div style={{ flex: 1 }}>
                       <label style={labelStyle}>상태</label>
-                      <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as WishItem["status"] })} style={fieldStyle}>
-                        {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={fieldStyle}>
+                        {wishStatuses.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                       </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>새 상태 추가</label>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input value={newStatusName} onChange={e => setNewStatusName(e.target.value)} style={{ ...fieldStyle, flex: 1 }} placeholder="봄/가을에 찾기, 겨울에 찾기..." />
+                      <button onClick={async () => { if (newStatusName.trim()) { const id = await addWishStatus(newStatusName.trim()); setForm({ ...form, status: id }); setNewStatusName(""); } }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#2A2A2A", color: "#F5F0E1", cursor: "pointer", fontSize: 12, fontFamily: "inherit", flexShrink: 0 }}>추가</button>
                     </div>
                   </div>
                   <div>

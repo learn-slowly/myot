@@ -34,9 +34,10 @@ export interface WishItem {
   id: string;
   name: string;
   price?: string;
-  status: "confirmed" | "summer" | "watch" | "hold";
+  status: string;
   note: string;
   link?: string;
+  image_url?: string;
 }
 
 // ─── CONSTANTS ──────────────────────────────────────────────────────
