@@ -3,7 +3,8 @@ import { put } from "@vercel/blob";
 import sharp from "sharp";
 
 export async function POST(req: NextRequest) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  // OIDC 방식(신규 기본)은 BLOB_STORE_ID만, 구방식은 BLOB_READ_WRITE_TOKEN이 존재
+  if (!process.env.BLOB_READ_WRITE_TOKEN && !process.env.BLOB_STORE_ID) {
     return NextResponse.json(
       { error: "Blob storage not configured" },
       { status: 500 }
