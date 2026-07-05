@@ -8,7 +8,7 @@ import {
   type Season, type Mood, type CategoryKey, type ClothingItem, type WishItem,
 } from "@/data/closet";
 
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/db";
 
 // ─── Helpers ────────────────────────────────────────────────────────
 function getCurrentSeason(): Season {

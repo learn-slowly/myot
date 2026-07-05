@@ -181,7 +181,8 @@
 - **프레임워크**: Next.js 15 + TypeScript
 - **스타일링**: Tailwind CSS v4
 - **폰트**: Pretendard Variable
-- **DB**: Supabase PostgreSQL (ap-northeast-2 서울 리전)
+- **DB**: Neon PostgreSQL (aws-ap-southeast-1 싱가포르 리전, 무료 플랜) — `/api/db` 서버 라우트 경유
+  - 2026-07-06 Supabase에서 이전 (비용 절감). 설계: `docs/superpowers/specs/2026-07-06-neon-migration-design.md`
 - **이미지 저장**: Cloudinary CDN (서버사이드 signed upload)
 - **AI 분석**: Anthropic API (Claude Sonnet) — Next.js API Route 경유 (키 보호)
   - `/api/analyze`: 이미지 + 텍스트 분석 (OOTD, 살/말)
@@ -193,7 +194,7 @@
 
 ### 3.2 향후 (v2)
 
-- **인증**: Supabase Auth
+- **인증**: Neon Auth 또는 Clerk 등 (Supabase 이전으로 재선정 필요)
 - **알림**: 웹 푸시 또는 카카오 알림톡
 - **스타일 축 온보딩**: 첫 실행 시 스타일 선택
 - **착용 통계 고도화**: 월별/시즌별 리포트, cost-per-wear
@@ -431,7 +432,7 @@ myot/
 │   │       ├── analyze-text/route.ts # Claude API (텍스트 분석)
 │   │       └── upload/route.ts    # Cloudinary 서버사이드 업로드
 │   ├── lib/
-│   │   └── supabase.ts            # Supabase 클라이언트
+│   │   └── db.ts                  # DB 쿼리 빌더 (/api/db 경유, supabase-js 호환 문법)
 │   ├── data/
 │   │   ├── closet.ts              # 타입, 상수 (카테고리/시즌/무드/태그)
 │   │   └── useLocalStorage.ts     # localStorage persist 훅
@@ -501,7 +502,7 @@ gh repo create myot --public --push
 - \[x\] 모든 데이터 Supabase DB 저장 (localStorage 제거)
 - \[x\] AI 코디 조합 생성 수정 (max_tokens 300→2048)
 - \[ \] 스타일 축 온보딩 (첫 실행 시)
-- \[ \] Supabase Auth 회원가입/로그인 (개인별 옷장)
+- \[ \] 회원가입/로그인 (개인별 옷장) — 인증 솔루션 재선정 필요 (Neon Auth/Clerk 등)
 - \[ \] 친구 옷장 구경 기능
 - \[ \] 온보딩: 쇼핑몰 주문내역 붙여넣기 → AI 파싱 → 옷장 자동 채우기
 - \[ \] 유료 플랜 (월 2,000원) — AI 기능 유료, 기본 기능 무료
