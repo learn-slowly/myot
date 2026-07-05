@@ -1,51 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
+import { put } from "@vercel/blob";
+import sharp from "sharp";
 
 export async function POST(req: NextRequest) {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
-
-  if (!cloudName || !apiKey || !apiSecret) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(
-      { error: "Cloudinary not configured" },
+      { error: "Blob storage not configured" },
       { status: 500 }
     );
   }
 
   const { image } = await req.json();
-
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const params = `folder=myot&timestamp=${timestamp}&transformation=c_limit,w_600,q_auto`;
-
-  const { createHash } = await import("crypto");
-  const signature = createHash("sha1")
-    .update(params + apiSecret)
-    .digest("hex");
-
-  const formData = new FormData();
-  formData.append("file", image);
-  formData.append("api_key", apiKey);
-  formData.append("timestamp", timestamp);
-  formData.append("signature", signature);
-  formData.append("folder", "myot");
-  formData.append("transformation", "c_limit,w_600,q_auto");
-
-  const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-    { method: "POST", body: formData }
-  );
-
-  if (!response.ok) {
-    const err = await response.text();
+  const match = /^data:image\/[a-z+.-]+;base64,(.+)$/i.exec(image ?? "");
+  if (!match) {
     return NextResponse.json(
-      { error: `Cloudinary error: ${response.status}` },
-      { status: response.status }
+      { error: "expected data URL image" },
+      { status: 400 }
     );
   }
 
-  const data = await response.json();
-  return NextResponse.json({
-    url: data.secure_url,
-    publicId: data.public_id,
-  });
+  try {
+    // Cloudinary 시절의 c_limit,w_600 변환과 동일한 축소를 서버에서 수행
+    const resized = await sharp(Buffer.from(match[1], "base64"))
+      .rotate() // EXIF 회전 반영 (폰 사진)
+      .resize({ width: 600, height: 600, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    const blob = await put(`myot/${crypto.randomUUID()}.webp`, resized, {
+      access: "public",
+      contentType: "image/webp",
+    });
+
+    return NextResponse.json({ url: blob.url, publicId: blob.pathname });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

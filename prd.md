@@ -183,11 +183,12 @@
 - **폰트**: Pretendard Variable
 - **DB**: Neon PostgreSQL (aws-ap-southeast-1 싱가포르 리전, 무료 플랜) — `/api/db` 서버 라우트 경유
   - 2026-07-06 Supabase에서 이전 (비용 절감). 설계: `docs/superpowers/specs/2026-07-06-neon-migration-design.md`
-- **이미지 저장**: Cloudinary CDN (서버사이드 signed upload)
+- **이미지 저장**: Vercel Blob (서버에서 sharp로 600px/webp 리사이즈 후 업로드)
+  - 2026-07-06 Cloudinary에서 교체 (계정 삭제됨 — 기존 이미지 유실, URL은 DB에서 정리)
 - **AI 분석**: Anthropic API (Claude Sonnet) — Next.js API Route 경유 (키 보호)
   - `/api/analyze`: 이미지 + 텍스트 분석 (OOTD, 살/말)
   - `/api/analyze-text`: 텍스트 전용 분석 (코디 코멘트, 조합 생성)
-  - `/api/upload`: Cloudinary 서버사이드 업로드
+  - `/api/upload`: Vercel Blob 서버사이드 업로드
 - **날씨**: Open-Meteo API (무료, 키 불필요, 상용 가능)
 - **배포**: Vercel (GitHub 자동 배포, Preview + Production 환경)
 - **PWA**: manifest.json + apple-touch-icon 설정 완료
