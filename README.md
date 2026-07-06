@@ -81,7 +81,11 @@ npm install
 # 환경변수 설정 (.env.local)
 ANTHROPIC_API_KEY=
 DATABASE_URL=          # Neon PostgreSQL connection string
-BLOB_READ_WRITE_TOKEN= # Vercel Blob (이미지 업로드)
+BLOB_READ_WRITE_TOKEN= # Vercel Blob (이미지 업로드, OIDC 스토어는 불필요)
+VAPID_PUBLIC_KEY=      # 웹 푸시 (npx web-push generate-vapid-keys)
+VAPID_PRIVATE_KEY=
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=  # VAPID_PUBLIC_KEY와 동일 값
+CRON_SECRET=           # /api/push/cron 보호용 랜덤 문자열
 
 # 로컬 개발
 npm run dev

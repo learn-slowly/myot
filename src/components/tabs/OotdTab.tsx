@@ -4,6 +4,7 @@ import { CATEGORIES } from "@/data/closet";
 import type { App } from "@/app/useAppState";
 import { ColorDot } from "@/components/ColorDot";
 import { ItemCard } from "@/components/ItemCard";
+import { PushToggle } from "@/components/PushToggle";
 
 export function OotdTab({ app }: { app: App }) {
   const {
@@ -28,7 +29,10 @@ export function OotdTab({ app }: { app: App }) {
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#2A2A2A" }}>착용 기록 ({ootdLogs.length}회)</div>
-          <button onClick={() => setOotdStatsView(false)} style={{ fontSize: 12, color: "#6B2D3E", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>+ 새 OOTD</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <PushToggle />
+            <button onClick={() => setOotdStatsView(false)} style={{ fontSize: 12, color: "#6B2D3E", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>+ 새 OOTD</button>
+          </div>
         </div>
 
         {topWorn.length > 0 && <div style={{ marginBottom: 20 }}>
@@ -100,16 +104,38 @@ export function OotdTab({ app }: { app: App }) {
 
   return (
     <div>
-      {ootdLogs.length > 0 && <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <button onClick={() => setOotdStatsView(true)} style={{ fontSize: 12, color: "#6B2D3E", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>기록 보기 ({ootdLogs.length}) →</button>
-      </div>}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <PushToggle />
+        {ootdLogs.length > 0 && <button onClick={() => setOotdStatsView(true)} style={{ fontSize: 12, color: "#6B2D3E", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>기록 보기 ({ootdLogs.length}) →</button>}
+      </div>
       <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: "none" }} />
-      {!ootdImage && (
-        <button onClick={() => fileInputRef.current?.click()} style={{ width: "100%", padding: "40px 20px", borderRadius: 16, border: "2px dashed rgba(107,45,62,0.2)", background: "rgba(107,45,62,0.03)", cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 32 }}>📸</span>
-          <span style={{ fontSize: 14, fontWeight: 500, color: "#6B2D3E" }}>오늘의 OOTD 올리기</span>
-          <span style={{ fontSize: 11, color: "#888" }}>사진을 올리면 AI가 착장을 분석해줘</span>
-        </button>
+      {!ootdImage && !ootdResult && (
+        <>
+          <button onClick={() => fileInputRef.current?.click()} style={{ width: "100%", padding: "40px 20px", borderRadius: 16, border: "2px dashed rgba(107,45,62,0.2)", background: "rgba(107,45,62,0.03)", cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 32 }}>📸</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "#6B2D3E" }}>오늘의 OOTD 올리기</span>
+            <span style={{ fontSize: 11, color: "#888" }}>사진을 올리면 AI가 착장을 분석해줘</span>
+          </button>
+
+          <button onClick={() => setOotdResult({ items: [], description: "" })} style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, border: "1.5px dashed rgba(0,0,0,0.12)", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 12, color: "#888" }}>✏️ 사진 없이 직접 기록하기</button>
+
+          {ootdLogs.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A", marginBottom: 8 }}>최근 조합 다시 입기</div>
+              {ootdLogs.slice(0, 3).map(log => (
+                <div key={log.id} style={{ background: "rgba(255,255,255,0.7)", borderRadius: 12, padding: "10px 14px", marginBottom: 6, border: "1px solid rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>{log.date}</div>
+                    <div style={{ fontSize: 12, color: "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {log.items.map(id => getItem(id)?.name).filter(Boolean).join(" + ") || log.description}
+                    </div>
+                  </div>
+                  <button onClick={() => setOotdResult({ items: log.items.filter(id => getItem(id)), description: log.description })} style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "#6B2D3E", color: "#fff", cursor: "pointer", fontSize: 11, fontFamily: "inherit", fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0 }}>이 조합으로</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
       {ootdImage && !ootdResult && (
         <div>

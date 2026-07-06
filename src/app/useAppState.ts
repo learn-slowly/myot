@@ -118,6 +118,7 @@ export function useAppState() {
       tags: ((r.tags as string[]) || []) as import("@/data/closet").StyleTag[], note: r.note as string | undefined, image_url: r.image_url as string | undefined,
       purchased_at: r.purchased_at as string | undefined, last_cleaned_at: r.last_cleaned_at as string | undefined,
       acquired_via: r.acquired_via as string | undefined, size: r.size as string | undefined,
+      price: r.price as number | undefined,
     })));
     if (combosRes.data) setCombos(combosRes.data as DbCombo[]);
     if (wishRes.data) setWishlist(wishRes.data.map((r: Record<string, unknown>) => ({
@@ -251,7 +252,7 @@ JSON 배열만 반환:
 
   const saveItem = async (item: ClothingItem) => {
     const isNew = item.id.startsWith("custom-");
-    const row = { id: item.id, cat: item.cat, name: item.name, brand: item.brand || null, color: item.color || null, season: item.season || [], tags: item.tags, note: item.note || null, purchased_at: item.purchased_at || null, last_cleaned_at: item.last_cleaned_at || null, acquired_via: item.acquired_via || null, size: item.size || null };
+    const row = { id: item.id, cat: item.cat, name: item.name, brand: item.brand || null, color: item.color || null, season: item.season || [], tags: item.tags, note: item.note || null, purchased_at: item.purchased_at || null, last_cleaned_at: item.last_cleaned_at || null, acquired_via: item.acquired_via || null, size: item.size || null, price: item.price ?? null };
     await supabase.from("clothing_items").upsert(row);
     setEditingItem(null);
     setAddingItem(false);

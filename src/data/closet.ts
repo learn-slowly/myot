@@ -19,6 +19,7 @@ export interface ClothingItem {
   last_cleaned_at?: string;
   acquired_via?: string;
   size?: string;
+  price?: number; // 구매가 (원)
 }
 
 export interface Combo {

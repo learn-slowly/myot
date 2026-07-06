@@ -113,6 +113,11 @@ export function ItemEditModal({ item, onSave, onDelete, onClose, onGenerateCombo
           </div>
 
           <div>
+            <label style={labelStyle}>구매가 (원)</label>
+            <input type="number" inputMode="numeric" value={form.price ?? ""} onChange={e => setForm({ ...form, price: e.target.value ? parseInt(e.target.value) : undefined })} style={fieldStyle} placeholder="53000 — 입력하면 착용당 비용 통계에 반영" />
+          </div>
+
+          <div>
             <label style={labelStyle}>메모</label>
             <input value={form.note || ""} onChange={e => setForm({ ...form, note: e.target.value || undefined })} style={fieldStyle} placeholder="덕 캔버스, 크롭 수선" />
           </div>
