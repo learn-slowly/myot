@@ -20,6 +20,7 @@ export function useAppState() {
   const [expandedCat, setExpandedCat] = useState<CategoryKey | null>(null);
   const [closetViewMode, setClosetViewMode] = useState<"category" | "date">("category");
   const [newWish, setNewWish] = useState("");
+  const [linkLoading, setLinkLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Weather state
@@ -457,6 +458,21 @@ JSON만 반환:
     await supabase.from("wish_items").insert({ name, status: "watch", note: "" });
     setNewWish(""); fetchData();
   };
+  // 상품 링크 붙여넣기 → OG/JSON-LD로 사진·이름·가격 추출 → 확인 모달(임시 찜)
+  const addWishFromLink = async (url: string) => {
+    setLinkLoading(true);
+    try {
+      const res = await fetch("/api/parse-link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || "링크를 읽지 못했어요"); return; }
+      setNewWish("");
+      setEditingWish({ id: crypto.randomUUID(), name: data.name || "", price: data.price || "", image_url: data.image_url || undefined, link: data.link || url, status: "watch", note: "링크" });
+    } catch {
+      alert("링크 분석 중 오류가 났어요");
+    } finally {
+      setLinkLoading(false);
+    }
+  };
   const saveWish = async (w: WishItem) => {
     await supabase.from("wish_items").upsert({ id: w.id, name: w.name, price: w.price || null, status: w.status, note: w.note || "", link: w.link || null, image_url: w.image_url || null });
     setEditingWish(null); fetchData();
@@ -560,7 +576,7 @@ ${wardrobeSummary}
     closetFilter, setClosetFilter,
     expandedCat, setExpandedCat,
     closetViewMode, setClosetViewMode,
-    newWish, setNewWish,
+    newWish, setNewWish, linkLoading, addWishFromLink,
     refreshKey, setRefreshKey,
     weather, weatherLoading,
     letgoItems, letgoAdding, setLetgoAdding, letgoSearch, setLetgoSearch, letgoRecCat, setLetgoRecCat,

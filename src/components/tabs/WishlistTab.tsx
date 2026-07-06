@@ -9,10 +9,16 @@ import { OrderImportModal } from "@/components/OrderImportModal";
 export function WishlistTab({ app }: { app: App }) {
   const {
     wishlist, wishStatuses, setEditingWish,
-    newWish, setNewWish, addWish,
+    newWish, setNewWish, addWish, linkLoading, addWishFromLink,
     savedCombos, getItem, fetchData,
   } = app;
   const [showImport, setShowImport] = useState(false);
+  const isUrl = /^https?:\/\//i.test(newWish.trim());
+  const submitWish = () => {
+    const v = newWish.trim();
+    if (!v || linkLoading) return;
+    isUrl ? addWishFromLink(v) : addWish(v);
+  };
 
   const grouped: Record<string, WishItem[]> = {};
   wishlist.forEach(w => { if (!grouped[w.status]) grouped[w.status] = []; grouped[w.status].push(w); });
@@ -45,8 +51,8 @@ export function WishlistTab({ app }: { app: App }) {
         </div>
       ); })}
       <div style={{ marginTop: 20, display: "flex", gap: 8 }}>
-        <input value={newWish} onChange={e => setNewWish(e.target.value)} placeholder="찜할 아이템 추가..." style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 13, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none" }} onKeyDown={e => { if (e.key === "Enter" && newWish.trim()) addWish(newWish.trim()); }} />
-        <button onClick={() => { if (newWish.trim()) addWish(newWish.trim()); }} style={{ padding: "10px 16px", borderRadius: 10, border: "none", background: "#2A2A2A", color: "#F5F0E1", cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "inherit" }}>추가</button>
+        <input value={newWish} onChange={e => setNewWish(e.target.value)} placeholder="찜할 아이템 추가... (상품 링크도 OK)" style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${isUrl ? "rgba(107,45,62,0.4)" : "rgba(0,0,0,0.1)"}`, fontSize: 13, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none" }} onKeyDown={e => { if (e.key === "Enter") submitWish(); }} />
+        <button onClick={submitWish} disabled={linkLoading} style={{ padding: "10px 16px", borderRadius: 10, border: "none", background: isUrl ? "#6B2D3E" : "#2A2A2A", color: "#F5F0E1", cursor: linkLoading ? "default" : "pointer", fontSize: 13, fontWeight: 500, fontFamily: "inherit", whiteSpace: "nowrap" }}>{linkLoading ? "분석 중..." : isUrl ? "링크 담기" : "추가"}</button>
       </div>
       <button onClick={() => setShowImport(true)} style={{ width: "100%", marginTop: 8, padding: 11, borderRadius: 10, border: "1.5px dashed rgba(107,45,62,0.25)", background: "rgba(107,45,62,0.03)", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500, color: "#6B2D3E" }}>📥 주문내역으로 한번에 추가</button>
       {showImport && <OrderImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); fetchData(); }} />}
