@@ -1,6 +1,7 @@
 "use client";
 
 import { CATEGORIES, SEASONS, TAG_COLORS, type Season, type ClothingItem } from "@/data/closet";
+import { getCurrentSeason } from "@/lib/utils";
 import { supabase } from "@/lib/db";
 import type { App } from "@/app/useAppState";
 import { ItemCard } from "@/components/ItemCard";
@@ -85,6 +86,34 @@ function ClosetStats({ app }: { app: App }) {
           </div>
         </div>
       </div>
+
+      {/* 이번 시즌 옷 활용률 — 북극성 지표 + 아직 안 입은 시즌 옷(입거나 비울 후보) */}
+      {(() => {
+        const cur = getCurrentSeason();
+        const seasonItems = allItems.filter(i => i.season?.includes(cur) && i.cat !== "accessories");
+        if (seasonItems.length < 3) return null;
+        const wornCount = seasonItems.filter(i => wearData.counts[i.id]).length;
+        const pct = Math.round((wornCount / seasonItems.length) * 100);
+        const neverWorn = seasonItems.filter(i => !wearData.counts[i.id]);
+        return (
+          <div style={{ ...statBox, marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A" }}>{SEASONS[cur]} 옷 활용률</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#6B2D3E" }}>{pct}% <span style={{ fontSize: 11, color: "#aaa", fontWeight: 400 }}>({wornCount}/{seasonItems.length})</span></span>
+            </div>
+            <div style={{ height: 8, borderRadius: 4, background: "rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: neverWorn.length ? 8 : 0 }}>
+              <div style={{ width: `${pct}%`, height: "100%", borderRadius: 4, background: pct >= 60 ? "#4A7C59" : "#C4952B", transition: "width 0.3s" }} />
+            </div>
+            {neverWorn.length > 0 && <>
+              <div style={{ fontSize: 11, color: "#C4952B", marginBottom: 5 }}>{SEASONS[cur]} 옷인데 아직 안 입은 {neverWorn.length}벌 — 입어보거나 비울까?</div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {neverWorn.slice(0, 12).map(i => <span key={i.id} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 16, background: "rgba(196,149,43,0.1)", color: "#C4952B" }}>{i.name}</span>)}
+                {neverWorn.length > 12 && <span style={{ fontSize: 10, color: "#aaa" }}>+{neverWorn.length - 12}</span>}
+              </div>
+            </>}
+          </div>
+        );
+      })()}
 
       <div style={{ ...statBox, marginBottom: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A", marginBottom: 8 }}>카테고리별</div>

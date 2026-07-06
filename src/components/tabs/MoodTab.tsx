@@ -10,7 +10,7 @@ export function MoodTab({ app }: { app: App }) {
   const {
     weather, weatherLoading, selectedSeason, setSelectedSeason,
     selectedMood, setSelectedMood, refreshKey, setRefreshKey,
-    combos, ootdLogs, getItem,
+    combos, ootdLogs, getItem, allItems, wearData,
   } = app;
 
   // 기온 → 시즌 자동 판단
@@ -69,6 +69,35 @@ export function MoodTab({ app }: { app: App }) {
         {Object.entries(SEASONS).map(([k, v]) => <Pill key={k} label={v} active={moodSeason === k} onClick={() => { setSelectedSeason(k as Season); setRefreshKey(r => r + 1); }} />)}
         {selectedSeason && <button onClick={() => { setSelectedSeason(null); setRefreshKey(r => r + 1); }} style={{ fontSize: 11, color: "#888", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}>자동으로</button>}
       </div>
+
+      {/* 요즘 뜸했던 옷 — 착용 결정 순간에 안 입던 옷 살려주기 (판단 루프) */}
+      {(() => {
+        const now = Date.now();
+        const neglected = allItems
+          .filter(i => i.cat !== "accessories" && i.season?.includes(moodSeason))
+          .map(i => ({ i, last: wearData.lastDates[i.id], count: wearData.counts[i.id] || 0 }))
+          .filter(c => c.last && (now - new Date(c.last).getTime()) / 86400000 > 21)
+          .sort((a, b) => a.count - b.count || (a.last || "").localeCompare(b.last || ""))
+          .slice(0, 3);
+        if (neglected.length < 2) return null;
+        return (
+          <div style={{ background: "rgba(196,149,43,0.06)", borderRadius: 14, padding: "12px 16px", marginBottom: 16, border: "1px solid rgba(196,149,43,0.15)" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#C4952B", marginBottom: 8 }}>요즘 뜸했던 옷 — 오늘 살려볼까?</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              {neglected.map(({ i, last }) => {
+                const days = Math.floor((now - new Date(last!).getTime()) / 86400000);
+                return (
+                  <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {i.image_url ? <img src={i.image_url} alt={i.name} style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} /> : i.color ? <ColorDot color={i.color} size={16} /> : null}
+                    <span style={{ flex: 1, fontSize: 12, color: "#2A2A2A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.name}</span>
+                    <span style={{ fontSize: 10, color: "#C4952B", flexShrink: 0 }}>{days}일째</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>
         {SEASONS[moodSeason]} · {selectedMood ? MOODS[selectedMood] : "전체"} — {filtered.length}개 조합
