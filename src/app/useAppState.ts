@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import exifr from "exifr";
 import { CATEGORIES, SEASONS, type Season, type Mood, type CategoryKey, type ClothingItem, type WishItem } from "@/data/closet";
 import { supabase } from "@/lib/db";
 import { getCurrentSeason, resizeImage } from "@/lib/utils";
@@ -297,6 +298,19 @@ JSON 배열만 반환:
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // 사진의 EXIF 촬영 날짜를 읽어 기록 날짜에 자동 반영 — 과거 OOTD 소급 기록용.
+    // 메타데이터가 없으면 오늘 날짜 유지. 저장 전 날짜 입력칸에서 확인·수정 가능.
+    exifr.parse(file, ["DateTimeOriginal", "CreateDate"]).then((exif) => {
+      const taken: unknown = exif?.DateTimeOriginal || exif?.CreateDate;
+      if (taken instanceof Date && !isNaN(taken.getTime())) {
+        const y = taken.getFullYear();
+        const m = String(taken.getMonth() + 1).padStart(2, "0");
+        const d = String(taken.getDate()).padStart(2, "0");
+        setOotdDate(`${y}-${m}-${d}`);
+      } else {
+        setOotdDate(new Date().toISOString().split("T")[0]);
+      }
+    }).catch(() => setOotdDate(new Date().toISOString().split("T")[0]));
     const reader = new FileReader();
     reader.onload = () => { setOotdImage(reader.result as string); setOotdResult(null); setOotdAddPicker(false); };
     reader.readAsDataURL(file);
