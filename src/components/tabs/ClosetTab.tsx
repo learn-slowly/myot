@@ -156,50 +156,6 @@ function ClosetStats({ app }: { app: App }) {
         </>;
       })()}
 
-      {/* 착용당 비용 (cost-per-wear) */}
-      {(() => {
-        const priced = allItems.filter(i => i.price && i.price > 0);
-        if (!priced.length) return (
-          <div style={{ ...statBox, marginTop: 8 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A", marginBottom: 4 }}>착용당 비용</div>
-            <div style={{ fontSize: 12, color: "#888" }}>아이템 편집에서 구매가를 입력하면 착용당 비용을 계산해줘</div>
-          </div>
-        );
-        const withCpw = priced.map(i => {
-          const count = wearData.counts[i.id] || 0;
-          return { item: i, count, cpw: count > 0 ? Math.round(i.price! / count) : i.price! };
-        });
-        const bestValue = withCpw.filter(c => c.count > 0).sort((a, b) => a.cpw - b.cpw).slice(0, 5);
-        const worstValue = withCpw.sort((a, b) => b.cpw - a.cpw).slice(0, 5);
-        const totalSpent = priced.reduce((sum, i) => sum + i.price!, 0);
-        return (
-          <div style={{ ...statBox, marginTop: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A" }}>착용당 비용</span>
-              <span style={{ fontSize: 11, color: "#888" }}>가격 입력 {priced.length}벌 · 총 {totalSpent.toLocaleString()}원</span>
-            </div>
-            {bestValue.length > 0 && <>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#4A7C59", marginBottom: 4 }}>본전 뽑는 중 (착용당 비용 낮은 순)</div>
-              {bestValue.map(({ item, count, cpw }) => (
-                <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontSize: 12, color: "#555", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
-                  <span style={{ fontSize: 11, color: "#4A7C59", fontWeight: 600 }}>{cpw.toLocaleString()}원/회</span>
-                  <span style={{ fontSize: 10, color: "#aaa", minWidth: 28, textAlign: "right" }}>{count}회</span>
-                </div>
-              ))}
-            </>}
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#C4952B", margin: "8px 0 4px" }}>아직 본전 못 뽑음</div>
-            {worstValue.map(({ item, count, cpw }) => (
-              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: "#555", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
-                <span style={{ fontSize: 11, color: "#C4952B", fontWeight: 600 }}>{cpw.toLocaleString()}원/회</span>
-                <span style={{ fontSize: 10, color: "#aaa", minWidth: 28, textAlign: "right" }}>{count > 0 ? `${count}회` : "미착용"}</span>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
-
       {/* 스타일 분석 */}
       {(() => {
         const tagCounts: Record<string, number> = {};

@@ -24,9 +24,10 @@ export async function POST(req: NextRequest) {
     },
     body: JSON.stringify({
       model: "claude-sonnet-5",
-      max_tokens: 1000,
-      // Sonnet 5는 thinking 생략 시 adaptive가 기본 — 짧은 JSON 응답 용도라 비활성 유지
-      thinking: { type: "disabled" },
+      // 옷장 ~100벌 대조 매칭이라 사고가 정확도에 크게 기여 — adaptive 유지,
+      // 사고 토큰이 max_tokens를 잠식하므로 여유 있게
+      max_tokens: 4000,
+      thinking: { type: "adaptive" },
       messages: [
         {
           role: "user",

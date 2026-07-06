@@ -318,16 +318,34 @@ JSON 배열만 반환:
 
   const buildAnalysisPrompt = () => {
     const itemList = allItems.map(i =>
-      `${i.id}: ${i.name}${i.color ? ` (${i.color})` : ''}${i.brand ? ` [${i.brand}]` : ''} — ${CATEGORIES[i.cat]}`
+      `${i.id}: ${i.name}${i.color ? ` (${i.color})` : ''}${i.brand ? ` [${i.brand}]` : ''} — ${CATEGORIES[i.cat] || customCats[i.cat] || i.cat}${i.season?.length ? ` [${i.season.map(s => SEASONS[s]).join('/')}]` : ''}`
     ).join('\n');
-    return `You are analyzing an OOTD (outfit of the day) photo. The person's wardrobe contains these items:\n\n${itemList}\n\nAnalyze the photo and identify which items from the wardrobe the person is wearing. Return ONLY a JSON object with no other text, in this exact format:\n{"items": ["id1", "id2", ...], "description": "Brief Korean description of the outfit"}\n\nRules:\n- Only use item IDs from the list above\n- Pick the closest matching items\n- Include: bottom, top, outer (if visible), shoes (if visible), accessories (glasses, tie, bag, watch if visible)\n- description should be 1-2 sentences in Korean describing the overall look`;
+    return `거울 셀피(OOTD) 사진을 분석해서, 아래 옷장 목록에서 착용 중인 아이템을 찾아줘.
+
+옷장 목록 (id: 이름 (색상) [브랜드] — 카테고리 [시즌]):
+${itemList}
+
+분석 순서:
+1. 사진에 보이는 착장을 부위별로 관찰해: 하의(색·핏·기장), 상의(이너까지), 아우터, 신발, 가방, 안경/모자/시계 같은 소품.
+2. 각 부위마다 옷장 목록에서 후보를 찾아. 이름의 색상 단어(진청/연청/중청, 크림/화이트, 그레이/블랙 등)와 옷 종류가 사진과 일치하는지 대조해.
+3. 비슷한 후보가 여럿이면 색상이 가장 정확히 일치하는 것을 골라. 색으로도 구분이 안 되면 핏(스트레이트/테이퍼드, 오버사이즈 등)으로 판단해.
+
+규칙:
+- 사진에 실제로 보이는 아이템만 포함해. 보이지 않는 부위는 추측하지 마.
+- 확신이 없는 아이템은 넣지 말고 빼. 틀린 매칭보다 빠뜨리는 게 낫다.
+- 목록에 없는 옷이 보이면 무시해.
+- 반드시 위 목록의 id만 사용해.
+
+JSON만 반환:
+{"items": ["id1", ...], "description": "전체 룩을 한국어 1-2문장으로"}`;
   };
 
   const analyzeOotd = async () => {
     if (!ootdImage) return;
     setOotdAnalyzing(true);
     try {
-      const resized = await resizeImage(ootdImage, 1024);
+      // Sonnet 5는 고해상도 vision 지원(최대 2576px) — 비슷한 옷 구분에 디테일이 중요
+      const resized = await resizeImage(ootdImage, 2000);
       const base64 = resized.split(",")[1];
       const response = await fetch("/api/analyze", {
         method: "POST", headers: { "Content-Type": "application/json" },
