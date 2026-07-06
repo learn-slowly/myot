@@ -11,6 +11,8 @@ const PROMPT = `이미지들은 온라인 쇼핑몰(무신사·네이버·29cm·
 - purchased_at: 구매확정일/주문일을 YYYY-MM-DD로 (화면의 날짜에서)
 - category: 다음 중 가장 가까운 것으로 추론 [bottoms, shirts, poloTees, shortTees, longTees, knits, hoodies, outerWinter, outerSpringFall, outerSummer, shoes, bags, hats, scarves, accessories]. 애매하면 accessories.
 - is_clothing: 옷/신발/가방 등 착용 아이템이면 true, 키링·폰케이스·상품권 같은 잡화면 false
+- image_index: 이 상품이 몇 번째 이미지에 있는지 (0부터 시작하는 정수)
+- box: 그 이미지 안에서 이 상품의 "썸네일 제품 사진"에만 딱 맞는 사각형. 각 주문 항목의 왼쪽에 있는 정사각형 제품 이미지야. 옆의 상품명 텍스트·가격·버튼·여백·다른 상품은 절대 포함하지 마 — 제품 사진의 네 변에 타이트하게. 이미지 좌상단 (0,0), 우하단 (1,1) 정규화 좌표로 {"x":좌상단x, "y":좌상단y, "w":너비, "h":높이}. 세로 위치를 특히 정확히 맞춰줘.
 
 규칙:
 - 취소·반품·배송비·적립 안내는 제외.
@@ -18,7 +20,7 @@ const PROMPT = `이미지들은 온라인 쇼핑몰(무신사·네이버·29cm·
 - 화면에 실제로 보이는 상품만. 추측 금지.
 
 다른 말 없이 JSON 배열만 반환:
-[{"name":"...","brand":null,"color":null,"size":null,"price":"...","purchased_at":"2026-01-01","category":"...","is_clothing":true}]`;
+[{"name":"...","brand":null,"color":null,"size":null,"price":"...","purchased_at":"2026-01-01","category":"...","is_clothing":true,"image_index":0,"box":{"x":0.0,"y":0.0,"w":0.0,"h":0.0}}]`;
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;

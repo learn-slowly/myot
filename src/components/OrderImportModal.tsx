@@ -5,17 +5,42 @@ import { CATEGORIES } from "@/data/closet";
 import { supabase } from "@/lib/db";
 import { resizeImage } from "@/lib/utils";
 
+type Box = { x: number; y: number; w: number; h: number };
 type Parsed = {
   name: string; brand?: string | null; color?: string | null; size?: string | null;
   price?: string | null; purchased_at?: string | null; category?: string | null; is_clothing?: boolean;
-  _include: boolean;
+  image_index?: number; box?: Box;
+  _include: boolean; _photo: string | null; // 크롭된 dataURL
 };
 
 const CAT_LABEL = (c?: string | null) => (c && (CATEGORIES as Record<string, string>)[c]) || "기타";
 
-// 주문내역 스크린샷/텍스트 → AI 파싱 → 검수 → 찜 일괄 등록
+// 원본 스크린샷 dataURL에서 정규화 박스로 정사각 크롭
+function cropFromImage(dataUrl: string, box: Box): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const sx = Math.max(0, box.x * img.width), sy = Math.max(0, box.y * img.height);
+      const sw = Math.max(1, Math.min(img.width - sx, box.w * img.width));
+      const sh = Math.max(1, Math.min(img.height - sy, box.h * img.height));
+      const size = 300;
+      const canvas = document.createElement("canvas");
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, size, size);
+      const scale = Math.min(size / sw, size / sh);
+      const dw = sw * scale, dh = sh * scale;
+      ctx.drawImage(img, sx, sy, sw, sh, (size - dw) / 2, (size - dh) / 2, dw, dh);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+// 주문내역 스크린샷/텍스트 → AI 파싱 → 검수(사진 미리보기) → 찜 일괄 등록
 export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const [images, setImages] = useState<string[]>([]); // dataURL[]
+  const [images, setImages] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [parsing, setParsing] = useState(false);
   const [items, setItems] = useState<Parsed[] | null>(null);
@@ -24,8 +49,7 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
   const fileRef = useRef<HTMLInputElement>(null);
 
   const addFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    files.forEach(f => {
+    Array.from(e.target.files || []).forEach(f => {
       const reader = new FileReader();
       reader.onload = () => setImages(prev => [...prev, reader.result as string]);
       reader.readAsDataURL(f);
@@ -37,18 +61,24 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
     if (!images.length && !text.trim()) return;
     setParsing(true); setError(null);
     try {
-      const payloadImages = await Promise.all(images.map(async (d) => {
-        const resized = await resizeImage(d, 2000);
-        return { data: resized.split(",")[1], mediaType: "image/jpeg" };
-      }));
+      const payloadImages = await Promise.all(images.map(async (d) => ({ data: (await resizeImage(d, 2000)).split(",")[1], mediaType: "image/jpeg" })));
       const res = await fetch("/api/parse-orders", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ images: payloadImages, text: text.trim() || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "분석 실패");
-      const parsed: Parsed[] = (data.items || []).map((it: Parsed) => ({ ...it, _include: it.is_clothing !== false }));
-      if (!parsed.length) throw new Error("주문 상품을 찾지 못했어요");
+      const rawItems: Parsed[] = data.items || [];
+      if (!rawItems.length) throw new Error("주문 상품을 찾지 못했어요");
+      // 박스로 사진 크롭 (원본 스크린샷 기준)
+      const parsed = await Promise.all(rawItems.map(async (it) => {
+        let photo: string | null = null;
+        const idx = it.image_index ?? 0;
+        if (it.box && it.box.w > 0.01 && it.box.h > 0.01 && images[idx]) {
+          try { photo = await cropFromImage(images[idx], it.box); } catch {}
+        }
+        return { ...it, _include: it.is_clothing !== false, _photo: photo };
+      }));
       setItems(parsed);
     } catch (e) {
       setError(e instanceof Error ? e.message : "분석 중 오류");
@@ -61,11 +91,19 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
     const chosen = items.filter(i => i._include);
     if (!chosen.length) return;
     setSaving(true);
-    const rows = chosen.map(i => ({
-      name: i.name,
-      price: i.price || null,
-      status: "watch",
-      note: ["주문내역", CAT_LABEL(i.category), i.size || null, i.purchased_at ? `구매 ${i.purchased_at}` : null].filter(Boolean).join(" · "),
+    const rows = await Promise.all(chosen.map(async (i) => {
+      let image_url: string | null = null;
+      if (i._photo) {
+        try {
+          const res = await fetch("/api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: i._photo }) });
+          const d = await res.json();
+          if (res.ok) image_url = d.url;
+        } catch {}
+      }
+      return {
+        name: i.name, price: i.price || null, status: "watch", image_url,
+        note: ["주문내역", CAT_LABEL(i.category), i.size || null, i.purchased_at ? `구매 ${i.purchased_at}` : null].filter(Boolean).join(" · "),
+      };
     }));
     await supabase.from("wish_items").insert(rows);
     setSaving(false);
@@ -73,6 +111,7 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
   };
 
   const field = { width: "100%", padding: "7px 10px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 12, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", boxSizing: "border-box" as const };
+  const update = (i: number, patch: Partial<Parsed>) => setItems(items!.map((x, j) => j === i ? { ...x, ...patch } : x));
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={onClose}>
@@ -84,7 +123,7 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
 
         {!items ? (
           <>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 12, lineHeight: 1.5 }}>무신사·네이버·29cm 등 주문내역 캡처를 올리거나 텍스트를 붙여넣으면, AI가 상품·가격·구매일·카테고리를 뽑아줘.</div>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 12, lineHeight: 1.5 }}>무신사·네이버·29cm 등 주문내역 캡처를 올리면, AI가 상품·가격·구매일·카테고리·사진을 뽑아줘.</div>
             <input ref={fileRef} type="file" accept="image/*" multiple onChange={addFiles} style={{ display: "none" }} />
             {images.length > 0 && (
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
@@ -103,16 +142,24 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
           </>
         ) : (
           <>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 10 }}>{items.length}개 발견 · 넣을 것만 체크하고 확인해. 옷 아닌 잡화는 미리 빼놨어.</div>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 10, lineHeight: 1.5 }}>{items.length}개 발견 · 넣을 것만 체크. 옷 아닌 잡화는 미리 빼놨어. 사진이 엉뚱하면 사진의 ✕로 빼줘.</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
               {items.map((it, i) => (
                 <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "8px 10px", borderRadius: 10, background: it._include ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.03)", border: "1px solid rgba(0,0,0,0.06)", opacity: it._include ? 1 : 0.55 }}>
-                  <input type="checkbox" checked={it._include} onChange={e => setItems(items.map((x, j) => j === i ? { ...x, _include: e.target.checked } : x))} style={{ marginTop: 3, cursor: "pointer", flexShrink: 0 }} />
+                  <input type="checkbox" checked={it._include} onChange={e => update(i, { _include: e.target.checked })} style={{ marginTop: 3, cursor: "pointer", flexShrink: 0 }} />
+                  {it._photo ? (
+                    <div style={{ position: "relative", flexShrink: 0 }}>
+                      <img src={it._photo} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover", border: "1px solid rgba(0,0,0,0.1)" }} />
+                      <span onClick={() => update(i, { _photo: null })} title="사진 빼기" style={{ position: "absolute", top: -5, right: -5, background: "#2A2A2A", color: "#fff", borderRadius: "50%", width: 15, height: 15, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>✕</span>
+                    </div>
+                  ) : (
+                    <div style={{ width: 44, height: 44, borderRadius: 8, background: "rgba(0,0,0,0.05)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#ccc" }}>👕</div>
+                  )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <input value={it.name} onChange={e => setItems(items.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} style={{ ...field, fontWeight: 500, marginBottom: 4 }} />
+                    <input value={it.name} onChange={e => update(i, { name: e.target.value })} style={{ ...field, fontWeight: 500, marginBottom: 4 }} />
                     <div style={{ display: "flex", gap: 6 }}>
-                      <input value={it.price || ""} onChange={e => setItems(items.map((x, j) => j === i ? { ...x, price: e.target.value } : x))} placeholder="가격" style={{ ...field, flex: 1 }} />
-                      <span style={{ fontSize: 10, color: "#888", alignSelf: "center", flexShrink: 0, padding: "0 4px" }}>{CAT_LABEL(it.category)}{it.is_clothing === false ? " · 잡화" : ""}{it.purchased_at ? ` · ${it.purchased_at}` : ""}</span>
+                      <input value={it.price || ""} onChange={e => update(i, { price: e.target.value })} placeholder="가격" style={{ ...field, flex: 1 }} />
+                      <span style={{ fontSize: 10, color: "#888", alignSelf: "center", flexShrink: 0 }}>{CAT_LABEL(it.category)}{it.is_clothing === false ? "·잡화" : ""}</span>
                     </div>
                   </div>
                 </div>
