@@ -238,7 +238,7 @@ ${itemSummary}
 
 export function ClosetTab({ app }: { app: App }) {
   const {
-    allItems, customCats, wearData, fetchData,
+    allItems, customCats, wearData, fetchData, itemLabel,
     imageUploading, generatingCombos,
     showClosetStats, setShowClosetStats,
     closetFilter, setClosetFilter, closetViewMode, setClosetViewMode,
@@ -276,7 +276,7 @@ export function ClosetTab({ app }: { app: App }) {
                   <span style={{ fontSize: 12, color: "#888" }}>{items.length}개 {isOpen ? "▲" : "▼"}</span>
                 </button>
                 {isOpen && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
-                  {items.map(i => <ItemCard key={i.id} item={i} imageUrl={i.image_url} onEdit={() => setEditingItem(i)} onAddPhoto={() => { setImageTargetId(i.id); itemImageInputRef.current?.click(); }} onRemovePhoto={() => { supabase.from("clothing_items").update({ image_url: null }).eq("id", i.id).then(() => fetchData()); }} wearCount={wearData.counts[i.id] || 0} lastWorn={wearData.lastDates[i.id]} />)}
+                  {items.map(i => <ItemCard key={i.id} item={i} imageUrl={i.image_url} label={itemLabel(i)} onEdit={() => setEditingItem(i)} onAddPhoto={() => { setImageTargetId(i.id); itemImageInputRef.current?.click(); }} onRemovePhoto={() => { supabase.from("clothing_items").update({ image_url: null }).eq("id", i.id).then(() => fetchData()); }} wearCount={wearData.counts[i.id] || 0} lastWorn={wearData.lastDates[i.id]} />)}
                 </div>}
               </div>
             );
@@ -302,7 +302,7 @@ export function ClosetTab({ app }: { app: App }) {
                   <span style={{ fontSize: 12, color: "#888" }}>{items.length}개 {isOpen ? "▲" : "▼"}</span>
                 </button>
                 {isOpen && <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
-                  {items.sort((a, b) => (b.purchased_at || "").localeCompare(a.purchased_at || "")).map(i => <ItemCard key={i.id} item={i} imageUrl={i.image_url} onEdit={() => setEditingItem(i)} onAddPhoto={() => { setImageTargetId(i.id); itemImageInputRef.current?.click(); }} onRemovePhoto={() => { supabase.from("clothing_items").update({ image_url: null }).eq("id", i.id).then(() => fetchData()); }} wearCount={wearData.counts[i.id] || 0} lastWorn={wearData.lastDates[i.id]} />)}
+                  {items.sort((a, b) => (b.purchased_at || "").localeCompare(a.purchased_at || "")).map(i => <ItemCard key={i.id} item={i} imageUrl={i.image_url} label={itemLabel(i)} onEdit={() => setEditingItem(i)} onAddPhoto={() => { setImageTargetId(i.id); itemImageInputRef.current?.click(); }} onRemovePhoto={() => { supabase.from("clothing_items").update({ image_url: null }).eq("id", i.id).then(() => fetchData()); }} wearCount={wearData.counts[i.id] || 0} lastWorn={wearData.lastDates[i.id]} />)}
                 </div>}
               </div>
             );

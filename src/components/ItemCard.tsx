@@ -2,11 +2,11 @@ import { TAG_COLORS, type ClothingItem } from "@/data/closet";
 import { ColorDot } from "./ColorDot";
 
 export function ItemCard({
-  item, compact, onClick, selected, onRemove, imageUrl, onAddPhoto, onRemovePhoto, onEdit, wearCount, lastWorn,
+  item, compact, onClick, selected, onRemove, imageUrl, onAddPhoto, onRemovePhoto, onEdit, wearCount, lastWorn, label,
 }: {
   item: ClothingItem; compact?: boolean; onClick?: () => void; selected?: boolean; onRemove?: () => void;
   imageUrl?: string; onAddPhoto?: () => void; onRemovePhoto?: () => void; onEdit?: () => void;
-  wearCount?: number; lastWorn?: string;
+  wearCount?: number; lastWorn?: string; label?: string;
 }) {
   return (
     <button
@@ -28,7 +28,7 @@ export function ItemCard({
       ) : null}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: compact ? 13 : 14, fontWeight: 500, color: "#2A2A2A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {item.name}
+          {label || item.name}
         </div>
         {!compact && item.brand && (
           <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{item.brand}</div>

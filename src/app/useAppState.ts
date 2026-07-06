@@ -88,6 +88,16 @@ export function useAppState() {
   const clothingItems = allItems.filter(i => i.cat !== "accessories");
   const activeSeason = selectedSeason || getCurrentSeason();
 
+  // 이름이 겹치는 아이템은 브랜드를 덧붙여 구분 (예: "스트레이트 청바지 진청 · 플랙")
+  const dupNames = (() => {
+    const counts: Record<string, number> = {};
+    allItems.forEach(i => { counts[i.name] = (counts[i.name] || 0) + 1; });
+    return new Set(Object.entries(counts).filter(([, n]) => n > 1).map(([name]) => name));
+  })();
+  const itemLabel = useCallback((item: ClothingItem) =>
+    dupNames.has(item.name) && item.brand ? `${item.name} · ${item.brand}` : item.name,
+    [dupNames]);
+
   // 착용 빈도 계산
   const wearData = (() => {
     const counts: Record<string, number> = {};
@@ -537,7 +547,7 @@ ${wardrobeSummary}
     showClosetStats, setShowClosetStats, styleAnalysis, setStyleAnalysis,
     analyzingStyle, setAnalyzingStyle, statsSeason, setStatsSeason, statsYear, setStatsYear,
     editingWish, setEditingWish,
-    getItem, clothingItems, activeSeason, wearData,
+    getItem, itemLabel, clothingItems, activeSeason, wearData,
     fetchData,
     generateCombosForItem, saveItem, deleteItem,
     handleItemImageUpload, handleImageUpload,

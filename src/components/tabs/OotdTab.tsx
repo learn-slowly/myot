@@ -1,14 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import { CATEGORIES } from "@/data/closet";
 import type { App } from "@/app/useAppState";
 import { ColorDot } from "@/components/ColorDot";
 import { ItemCard } from "@/components/ItemCard";
+import { Pill } from "@/components/Pill";
 import { PushToggle } from "@/components/PushToggle";
+
+// 착장에서 자주 놓치는 소품·가방 카테고리 (한 장 셀피로는 작게 보임)
+const MISS_CATS = ["bags", "accessories", "hats", "scarves"];
 
 export function OotdTab({ app }: { app: App }) {
   const {
-    ootdLogs, clothingItems, getItem, allItems, customCats,
+    ootdLogs, clothingItems, getItem, itemLabel, allItems, customCats, wearData,
     ootdStatsView, setOotdStatsView,
     ootdPhotoInputRef, handleOotdPhotoUpload, setOotdPhotoTargetId, ootdPhotoUploading,
     deleteOotdLog, editingMemoId, setEditingMemoId, editingMemoText, setEditingMemoText, saveOotdMemo,
@@ -17,6 +22,7 @@ export function OotdTab({ app }: { app: App }) {
     ootdAddPicker, setOotdAddPicker, ootdSearchQuery, setOotdSearchQuery,
     ootdDate, setOotdDate, ootdMemo, setOotdMemo, saveOotdRecord, ootdSaving,
   } = app;
+  const [pickerCat, setPickerCat] = useState<string>("all");
 
   const counts: Record<string, number> = {};
   ootdLogs.forEach(log => { log.items.forEach(id => { counts[id] = (counts[id] || 0) + 1; }); });
@@ -94,7 +100,7 @@ export function OotdTab({ app }: { app: App }) {
               <button onClick={() => { setEditingMemoId(log.id); setEditingMemoText(""); }} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px dashed rgba(0,0,0,0.12)", background: "transparent", color: "#aaa", cursor: "pointer", fontFamily: "inherit", marginBottom: 6 }}>+ 메모</button>
             )}
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-              {log.items.map(id => { const item = getItem(id); if (!item) return null; return <span key={id} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 16, background: "rgba(0,0,0,0.06)", color: "#555" }}>{item.name}</span>; })}
+              {log.items.map(id => { const item = getItem(id); if (!item) return null; return <span key={id} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 16, background: "rgba(0,0,0,0.06)", color: "#555" }}>{itemLabel(item)}</span>; })}
             </div>
           </div>
         ))}
@@ -162,24 +168,54 @@ export function OotdTab({ app }: { app: App }) {
             <div style={{ fontSize: 12, color: "#555", marginBottom: 12, lineHeight: 1.6 }}>{ootdResult.description}</div>
             <div style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A", marginBottom: 8 }}>매칭된 아이템 ({ootdResult.items.length})</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
-              {ootdResult.items.map(id => { const item = getItem(id); if (!item) return null; return <ItemCard key={id} item={item} compact onRemove={() => setOotdResult({ ...ootdResult, items: ootdResult.items.filter(i => i !== id) })} />; })}
+              {ootdResult.items.map(id => { const item = getItem(id); if (!item) return null; return <ItemCard key={id} item={item} compact imageUrl={item.image_url} label={itemLabel(item)} onRemove={() => setOotdResult({ ...ootdResult, items: ootdResult.items.filter(i => i !== id) })} />; })}
             </div>
+
+            {/* 혹시 이것도? — 착장에 안 잡힌 소품/가방 카테고리를 사진으로 원탭 추가 (자주 놓치는 부위) */}
+            {(() => {
+              const present = new Set(ootdResult.items.map(id => getItem(id)?.cat));
+              const suggest = allItems
+                .filter(i => !ootdResult.items.includes(i.id) && i.image_url && MISS_CATS.includes(i.cat) && !present.has(i.cat))
+                .sort((a, b) => (wearData.counts[b.id] || 0) - (wearData.counts[a.id] || 0))
+                .slice(0, 8);
+              if (!suggest.length) return null;
+              return (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>혹시 이것도? <span style={{ color: "#aaa" }}>탭해서 추가</span></div>
+                  <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+                    {suggest.map(item => (
+                      <button key={item.id} onClick={() => setOotdResult({ ...ootdResult, items: [...ootdResult.items, item.id] })} style={{ flexShrink: 0, width: 64, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
+                        <img src={item.image_url} alt={item.name} style={{ width: 64, height: 64, borderRadius: 10, objectFit: "cover", border: "1px solid rgba(0,0,0,0.08)", display: "block" }} />
+                        <div style={{ fontSize: 9, color: "#666", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{item.name}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {ootdAddPicker ? (
               <div style={{ marginBottom: 12 }}>
                 <input value={ootdSearchQuery} onChange={e => setOotdSearchQuery(e.target.value)} placeholder="아이템 검색..." style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 12, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
-                <div style={{ maxHeight: 240, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-                  {allItems.filter(i => !ootdResult.items.includes(i.id)).filter(i => {
+                <div style={{ display: "flex", gap: 4, overflowX: "auto", marginBottom: 8, paddingBottom: 2 }}>
+                  <Pill label="전체" active={pickerCat === "all"} onClick={() => setPickerCat("all")} />
+                  {Object.entries({ ...CATEGORIES, ...customCats }).filter(([k]) => allItems.some(i => i.cat === k && !ootdResult.items.includes(i.id))).map(([k, v]) => (
+                    <Pill key={k} label={v} active={pickerCat === k} onClick={() => setPickerCat(k)} />
+                  ))}
+                </div>
+                <div style={{ maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+                  {allItems.filter(i => !ootdResult.items.includes(i.id)).filter(i => pickerCat === "all" || i.cat === pickerCat).filter(i => {
                     if (!ootdSearchQuery.trim()) return true;
                     const q = ootdSearchQuery.toLowerCase();
                     return i.name.toLowerCase().includes(q) || (i.brand || "").toLowerCase().includes(q) || (i.color || "").toLowerCase().includes(q) || (CATEGORIES[i.cat] || customCats[i.cat] || i.cat).includes(q);
                   }).map(item => (
-                    <ItemCard key={item.id} item={item} compact onClick={() => setOotdResult({ ...ootdResult, items: [...ootdResult.items, item.id] })} />
+                    <ItemCard key={item.id} item={item} compact imageUrl={item.image_url} label={itemLabel(item)} onClick={() => setOotdResult({ ...ootdResult, items: [...ootdResult.items, item.id] })} />
                   ))}
                 </div>
-                <button onClick={() => { setOotdAddPicker(false); setOotdSearchQuery(""); }} style={{ marginTop: 8, width: "100%", padding: 8, borderRadius: 8, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888" }}>닫기</button>
+                <button onClick={() => { setOotdAddPicker(false); setOotdSearchQuery(""); setPickerCat("all"); }} style={{ marginTop: 8, width: "100%", padding: 8, borderRadius: 8, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888" }}>닫기</button>
               </div>
             ) : (
-              <button onClick={() => setOotdAddPicker(true)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1.5px dashed rgba(0,0,0,0.12)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888", marginBottom: 12 }}>+ 아이템 추가/수정</button>
+              <button onClick={() => setOotdAddPicker(true)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1.5px dashed rgba(0,0,0,0.12)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888", marginBottom: 12 }}>+ 아이템 직접 추가</button>
             )}
             <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
               <input type="date" value={ootdDate} onChange={e => setOotdDate(e.target.value)} style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 12, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", boxSizing: "border-box" }} />
