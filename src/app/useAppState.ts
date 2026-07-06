@@ -507,16 +507,13 @@ JSON만 반환:
     await fetchData();
     setView("closet");
   };
-  const judgeWish = async (wish: WishItem) => {
+  const judgeWish = (wish: WishItem) => {
     if (!wish.image_url) return;
+    // URL을 그대로 넘김 — 표시는 <img>, 분석 시엔 서버가 fetch (외부 쇼핑몰 이미지 CORS 회피)
+    setBuyImage(wish.image_url);
+    setBuyResult(null);
     setEditingWish(null);
-    try {
-      const blob = await (await fetch(wish.image_url)).blob();
-      const dataUrl = await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(blob); });
-      setBuyImage(dataUrl);
-      setBuyResult(null);
-      setView("buyornot");
-    } catch { /* 이미지 로드 실패 시 무시 */ }
+    setView("buyornot");
   };
 
   // ─── BUY OR NOT (살/말) ─────────────────────────────────────────
@@ -524,8 +521,12 @@ JSON만 반환:
     if (!buyImage) return;
     setBuyAnalyzing(true);
     try {
-      const resized = await resizeImage(buyImage, 1024);
-      const base64 = resized.split(",")[1];
+      // 업로드 사진(dataURL)은 클라이언트 리사이즈, 링크로 담은 외부/blob URL은
+      // 서버가 fetch (CORS·canvas taint 회피)
+      const isDataUrl = buyImage.startsWith("data:");
+      const imgPayload = isDataUrl
+        ? { image: (await resizeImage(buyImage, 1024)).split(",")[1], mediaType: "image/jpeg" }
+        : { imageUrl: buyImage };
 
       const wardrobeSummary = allItems.filter(i => i.cat !== "accessories").map(i =>
         `${i.name}${i.color ? ` (${i.color})` : ""}${i.brand ? ` [${i.brand}]` : ""} — ${CATEGORIES[i.cat]}${i.season ? ` [${i.season.map(s => SEASONS[s]).join("/")}]` : ""}`
@@ -551,7 +552,7 @@ ${wardrobeSummary}
 
       const response = await fetch("/api/analyze", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64, mediaType: "image/jpeg", prompt }),
+        body: JSON.stringify({ ...imgPayload, prompt }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);

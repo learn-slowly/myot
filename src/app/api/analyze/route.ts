@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 
 export const config = {
   api: { bodyParser: { sizeLimit: "10mb" } },
 };
+
+const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -13,7 +16,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { image, mediaType, prompt } = await req.json();
+  const { image, mediaType, prompt, imageUrl } = await req.json();
+
+  // imageUrl이 오면 서버가 대신 가져와 정규화 (외부 쇼핑몰 이미지는 브라우저에서
+  // CORS로 fetch/canvas가 막히므로 — 링크로 담은 찜 사진 살/말 판단 지원)
+  let imgData = image, imgType = mediaType;
+  if (imageUrl && !image) {
+    try {
+      const r = await fetch(imageUrl, { headers: { "User-Agent": UA }, redirect: "follow", signal: AbortSignal.timeout(12000) });
+      if (!r.ok) return NextResponse.json({ error: `이미지를 불러오지 못했어요 (${r.status})` }, { status: 502 });
+      const resized = await sharp(Buffer.from(await r.arrayBuffer())).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+      imgData = resized.toString("base64");
+      imgType = "image/jpeg";
+    } catch {
+      return NextResponse.json({ error: "이미지를 불러오지 못했어요" }, { status: 502 });
+    }
+  }
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -34,7 +52,7 @@ export async function POST(req: NextRequest) {
           content: [
             {
               type: "image",
-              source: { type: "base64", media_type: mediaType, data: image },
+              source: { type: "base64", media_type: imgType, data: imgData },
             },
             { type: "text", text: prompt },
           ],
