@@ -47,6 +47,8 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const itemPhotoRef = useRef<HTMLInputElement>(null);
+  const [photoTargetIdx, setPhotoTargetIdx] = useState<number | null>(null);
 
   const addFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     Array.from(e.target.files || []).forEach(f => {
@@ -113,6 +115,17 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
   const field = { width: "100%", padding: "7px 10px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 12, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", boxSizing: "border-box" as const };
   const update = (i: number, patch: Partial<Parsed>) => setItems(items!.map((x, j) => j === i ? { ...x, ...patch } : x));
 
+  // 각 항목에 사용자 사진 직접 넣기 (크롭이 엉뚱하거나 없을 때)
+  const addPhotoForItem = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const idx = photoTargetIdx;
+    if (!file || idx == null) return;
+    const dataUrl = await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(file); });
+    update(idx, { _photo: await resizeImage(dataUrl, 800) });
+    setPhotoTargetIdx(null);
+    e.target.value = "";
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", background: "linear-gradient(160deg, #F5F0E1, #E8E0D0)", borderRadius: "20px 20px 0 0", padding: "20px 16px 32px" }}>
@@ -142,7 +155,8 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
           </>
         ) : (
           <>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 10, lineHeight: 1.5 }}>{items.length}개 발견 · 넣을 것만 체크. 옷 아닌 잡화는 미리 빼놨어. 사진이 엉뚱하면 사진의 ✕로 빼줘.</div>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 10, lineHeight: 1.5 }}>{items.length}개 발견 · 넣을 것만 체크. 옷 아닌 잡화는 미리 빼놨어. 사진이 엉뚱하면 ✕로 빼고, 빈 칸을 눌러 직접 넣어도 돼.</div>
+            <input ref={itemPhotoRef} type="file" accept="image/*" onChange={addPhotoForItem} style={{ display: "none" }} />
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
               {items.map((it, i) => (
                 <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "8px 10px", borderRadius: 10, background: it._include ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.03)", border: "1px solid rgba(0,0,0,0.06)", opacity: it._include ? 1 : 0.55 }}>
@@ -153,7 +167,10 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
                       <span onClick={() => update(i, { _photo: null })} title="사진 빼기" style={{ position: "absolute", top: -5, right: -5, background: "#2A2A2A", color: "#fff", borderRadius: "50%", width: 15, height: 15, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>✕</span>
                     </div>
                   ) : (
-                    <div style={{ width: 44, height: 44, borderRadius: 8, background: "rgba(0,0,0,0.05)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#ccc" }}>👕</div>
+                    <button onClick={() => { setPhotoTargetIdx(i); itemPhotoRef.current?.click(); }} title="사진 직접 넣기" style={{ width: 44, height: 44, borderRadius: 8, background: "rgba(0,0,0,0.04)", border: "1.5px dashed rgba(0,0,0,0.15)", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                      <span style={{ fontSize: 13, color: "#aaa" }}>＋</span>
+                      <span style={{ fontSize: 8, color: "#aaa" }}>사진</span>
+                    </button>
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <input value={it.name} onChange={e => update(i, { name: e.target.value })} style={{ ...field, fontWeight: 500, marginBottom: 4 }} />
