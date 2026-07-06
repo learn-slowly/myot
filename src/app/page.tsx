@@ -305,6 +305,9 @@ export default function Home() {
   const [ootdAddPicker, setOotdAddPicker] = useState(false);
   const [ootdSearchQuery, setOotdSearchQuery] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const ootdPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [ootdPhotoTargetId, setOotdPhotoTargetId] = useState<string | null>(null);
+  const [ootdPhotoUploading, setOotdPhotoUploading] = useState<string | null>(null);
 
   // Supabase data
   const [allItems, setAllItems] = useState<ClothingItem[]>([]);
@@ -642,6 +645,32 @@ JSON 배열만 반환:
     fetchData();
   };
 
+  const handleOotdPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const targetId = ootdPhotoTargetId;
+    if (!file || !targetId) return;
+    setOotdPhotoUploading(targetId);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      const resized = await resizeImage(base64, 800);
+      const res = await fetch("/api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: resized }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await supabase.from("ootd_logs").update({ image_url: data.url }).eq("id", targetId);
+      fetchData();
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert("사진 업로드에 실패했어요.");
+    }
+    setOotdPhotoTargetId(null);
+    setOotdPhotoUploading(null);
+    e.target.value = "";
+  };
+
   // ─── Wishlist CRUD ──────────────────────────────────────────────
   const [editingWish, setEditingWish] = useState<WishItem | null>(null);
 
@@ -710,16 +739,21 @@ JSON 배열만 반환:
           </div>}
 
           <div style={{ fontSize: 12, fontWeight: 600, color: "#2A2A2A", marginBottom: 8 }}>최근 기록</div>
+          <input ref={ootdPhotoInputRef} type="file" accept="image/*" onChange={handleOotdPhotoUpload} style={{ display: "none" }} />
           {ootdLogs.map(log => (
             <div key={log.id} style={{ background: "rgba(255,255,255,0.7)", borderRadius: 12, padding: "12px 16px", marginBottom: 8, border: "1px solid rgba(0,0,0,0.06)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: "#6B2D3E" }}>{log.date}</span>
                 <button onClick={() => deleteOotdLog(log.id)} style={{ border: "none", background: "transparent", color: "#CCC", cursor: "pointer", fontSize: 14 }}>✕</button>
               </div>
-              {log.image_url && (
+              {log.image_url ? (
                 <div style={{ borderRadius: 10, overflow: "hidden", marginBottom: 8 }}>
                   <img src={log.image_url} alt={`OOTD ${log.date}`} style={{ width: "100%", maxHeight: 280, objectFit: "cover", display: "block" }} />
                 </div>
+              ) : (
+                <button onClick={() => { setOotdPhotoTargetId(log.id); ootdPhotoInputRef.current?.click(); }} disabled={ootdPhotoUploading === log.id} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px dashed rgba(0,0,0,0.12)", background: "transparent", color: "#aaa", cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
+                  {ootdPhotoUploading === log.id ? "업로드 중..." : "+ 사진"}
+                </button>
               )}
               <div style={{ fontSize: 12, color: "#555", marginBottom: 6, lineHeight: 1.5 }}>{log.description}</div>
               {editingMemoId === log.id ? (
