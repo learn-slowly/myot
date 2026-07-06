@@ -426,18 +426,25 @@ myot/
 ├── src/
 │   ├── app/
 │   │   ├── layout.tsx             # 루트 레이아웃 (Pretendard 폰트, PWA 메타)
-│   │   ├── page.tsx               # 메인 앱 (6탭: OOTD/옷장/코디/오늘뭐입지/살말/찜)
+│   │   ├── page.tsx               # 셸 (헤더 + 탭 네비 + 모달 호스팅, ~90줄)
+│   │   ├── useAppState.ts         # 전체 상태·핸들러 훅 (App 타입 export)
 │   │   ├── globals.css            # Tailwind v4 + 테마 변수
 │   │   └── api/
 │   │       ├── analyze/route.ts   # Claude Vision API (이미지 분석)
 │   │       ├── analyze-text/route.ts # Claude API (텍스트 분석)
-│   │       └── upload/route.ts    # Cloudinary 서버사이드 업로드
+│   │       ├── db/route.ts        # Neon DB 쿼리 실행 (테이블 화이트리스트)
+│   │       └── upload/route.ts    # Vercel Blob 업로드 (sharp 리사이즈)
 │   ├── lib/
-│   │   └── db.ts                  # DB 쿼리 빌더 (/api/db 경유, supabase-js 호환 문법)
+│   │   ├── db.ts                  # DB 쿼리 빌더 (/api/db 경유, supabase-js 호환 문법)
+│   │   └── utils.ts               # getCurrentSeason, resizeImage, LETGO_STATUSES
+│   ├── types.ts                   # DbCombo, OotdLog, SavedCombo 등 공용 타입
 │   ├── data/
 │   │   ├── closet.ts              # 타입, 상수 (카테고리/시즌/무드/태그)
 │   │   └── useLocalStorage.ts     # localStorage persist 훅
-│   └── components/                # (향후 분리)
+│   └── components/
+│       ├── tabs/                  # 탭별 컴포넌트 (Ootd/Closet/Combo/Mood/BuyOrNot/Wishlist/Letgo)
+│       ├── ItemCard.tsx / ColorDot.tsx / Pill.tsx
+│       └── ItemEditModal.tsx / WishEditModal.tsx
 ├── package.json
 ├── tsconfig.json
 ├── next.config.ts
@@ -507,7 +514,7 @@ gh repo create myot --public --push
 - \[ \] 친구 옷장 구경 기능
 - \[ \] 온보딩: 쇼핑몰 주문내역 붙여넣기 → AI 파싱 → 옷장 자동 채우기
 - \[ \] 유료 플랜 (월 2,000원) — AI 기능 유료, 기본 기능 무료
-- \[ \] 컴포넌트 분리 리팩토링 (page.tsx 1700줄+ → 탭별 분리)
+- \[x\] 컴포넌트 분리 리팩토링 (page.tsx 1,788줄 → 92줄 셸 + useAppState 훅 + 탭별 컴포넌트)
 - \[ \] Expo (React Native) 네이티브 앱 전환 → 앱스토어 출시
 - \[ \] 중고 연동 (처분 추천 → 번개장터/당근)
 
