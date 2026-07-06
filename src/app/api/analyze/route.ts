@@ -23,8 +23,10 @@ export async function POST(req: NextRequest) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5",
       max_tokens: 1000,
+      // Sonnet 5는 thinking 생략 시 adaptive가 기본 — 짧은 JSON 응답 용도라 비활성 유지
+      thinking: { type: "disabled" },
       messages: [
         {
           role: "user",
