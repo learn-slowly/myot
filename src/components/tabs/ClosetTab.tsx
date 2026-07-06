@@ -4,6 +4,7 @@ import { CATEGORIES, SEASONS, TAG_COLORS, type Season, type ClothingItem } from 
 import { supabase } from "@/lib/db";
 import type { App } from "@/app/useAppState";
 import { ItemCard } from "@/components/ItemCard";
+import { Markdown } from "@/components/Markdown";
 import { Pill } from "@/components/Pill";
 
 function ClosetStats({ app }: { app: App }) {
@@ -220,7 +221,9 @@ ${itemSummary}
                   {analyzingStyle ? "AI 분석 중..." : "AI로 내 스타일 분석하기"}
                 </button>
                 {styleAnalysis && (
-                  <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: "rgba(107,45,62,0.04)", border: "1px solid rgba(107,45,62,0.1)", fontSize: 12, color: "#555", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{styleAnalysis}</div>
+                  <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: "rgba(107,45,62,0.04)", border: "1px solid rgba(107,45,62,0.1)", fontSize: 12, color: "#555" }}>
+                    <Markdown text={styleAnalysis} />
+                  </div>
                 )}
               </>
             ) : (

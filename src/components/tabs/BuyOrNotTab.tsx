@@ -2,6 +2,7 @@
 
 import { supabase } from "@/lib/db";
 import type { App } from "@/app/useAppState";
+import { Markdown } from "@/components/Markdown";
 
 export function BuyOrNotTab({ app }: { app: App }) {
   const {
@@ -59,7 +60,7 @@ export function BuyOrNotTab({ app }: { app: App }) {
           <div style={{ background: "rgba(255,255,255,0.7)", borderRadius: 14, padding: 20, marginBottom: 12, border: "1px solid rgba(0,0,0,0.06)", textAlign: "center" }}>
             <div style={{ fontSize: 48, marginBottom: 8 }}>{buyResult.emoji}</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: "#2A2A2A", marginBottom: 16 }}>{buyResult.verdict}</div>
-            <div style={{ fontSize: 13, color: "#555", lineHeight: 1.8, textAlign: "left" }}>{buyResult.analysis}</div>
+            <div style={{ fontSize: 13, color: "#555", textAlign: "left" }}><Markdown text={buyResult.analysis} /></div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => { setBuyImage(null); setBuyResult(null); }} style={{ flex: 1, padding: 12, borderRadius: 12, border: "1.5px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", color: "#888" }}>다른 옷 분석</button>
