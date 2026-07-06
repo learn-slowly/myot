@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   /^\/api\/auth$/,
   /^\/api\/push\/cron$/,
   /^\/api\/backup\/cron$/,
+  /^\/api\/version$/,
   /^\/sw\.js$/,
   /^\/manifest\.json$/,
   /^\/favicon\.ico$/,

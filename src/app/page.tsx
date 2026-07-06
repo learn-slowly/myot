@@ -11,6 +11,7 @@ import { MoodTab } from "@/components/tabs/MoodTab";
 import { BuyOrNotTab } from "@/components/tabs/BuyOrNotTab";
 import { WishlistTab } from "@/components/tabs/WishlistTab";
 import { LetgoTab } from "@/components/tabs/LetgoTab";
+import { UpdateBanner } from "@/components/UpdateBanner";
 
 export default function Home() {
   const app = useAppState();
@@ -36,6 +37,7 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: "100vh", maxWidth: 480, margin: "0 auto" }}>
+      <UpdateBanner />
       <input ref={itemImageInputRef} type="file" accept="image/*" onChange={handleItemImageUpload} style={{ display: "none" }} />
       <div style={{ padding: "24px 20px 16px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.5px", color: "#2A2A2A" }}>내<span style={{ color: "#6B2D3E" }}>옷</span> myot</h1>
