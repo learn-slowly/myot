@@ -4,13 +4,15 @@ import { useState, useRef } from "react";
 import type { WishItem } from "@/data/closet";
 import type { WishStatus } from "@/types";
 
-export function WishEditModal({ wish, wishStatuses, onClose, onSave, onDelete, onAddStatus }: {
+export function WishEditModal({ wish, wishStatuses, onClose, onSave, onDelete, onAddStatus, onMoveToCloset, onJudge }: {
   wish: WishItem;
   wishStatuses: WishStatus[];
   onClose: () => void;
   onSave: (w: WishItem) => void;
   onDelete: (id: string) => void;
   onAddStatus: (label: string) => Promise<string>;
+  onMoveToCloset: (w: WishItem) => void;
+  onJudge: (w: WishItem) => void;
 }) {
   const [form, setForm] = useState({ ...wish });
   const [newStatusName, setNewStatusName] = useState("");
@@ -84,7 +86,14 @@ export function WishEditModal({ wish, wishStatuses, onClose, onSave, onDelete, o
             <input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} style={fieldStyle} placeholder="빼입기용, 여름에 필요" />
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+
+        {/* 찜 = 인박스: 여기서 살/말 판단으로 보내거나 옷장으로 졸업 */}
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button onClick={() => onJudge(form)} disabled={!form.image_url} title={form.image_url ? "" : "사진이 있어야 살/말 판단 가능"} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1.5px solid rgba(107,45,62,0.25)", background: form.image_url ? "rgba(107,45,62,0.04)" : "rgba(0,0,0,0.03)", color: form.image_url ? "#6B2D3E" : "#bbb", cursor: form.image_url ? "pointer" : "default", fontSize: 12, fontWeight: 500, fontFamily: "inherit" }}>🤔 살/말 판단</button>
+          <button onClick={() => onMoveToCloset(form)} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1.5px solid rgba(74,124,89,0.3)", background: "rgba(74,124,89,0.06)", color: "#4A7C59", cursor: "pointer", fontSize: 12, fontWeight: 500, fontFamily: "inherit" }}>📦 옷장으로 (샀어)</button>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <button onClick={() => onDelete(form.id)} style={{ padding: "12px 16px", borderRadius: 10, border: "1.5px solid rgba(232,93,93,0.3)", background: "transparent", color: "#E85D5D", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>삭제</button>
           <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", color: "#888" }}>취소</button>
           <button onClick={() => onSave(form)} style={{ flex: 2, padding: 12, borderRadius: 10, border: "none", background: "#2A2A2A", color: "#F5F0E1", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>저장</button>

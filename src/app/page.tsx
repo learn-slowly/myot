@@ -19,7 +19,7 @@ export default function Home() {
     itemImageInputRef, handleItemImageUpload,
     editingItem, setEditingItem, addingItem, setAddingItem,
     saveItem, deleteItem, generateCombosForItem, customCats, fetchData,
-    editingWish, setEditingWish, wishStatuses, saveWish, removeWish, addWishStatus,
+    editingWish, setEditingWish, wishStatuses, saveWish, removeWish, addWishStatus, moveWishToCloset, judgeWish,
   } = app;
 
   if (loading) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#888", fontSize: 14 }}>로딩 중...</div>;
@@ -85,6 +85,8 @@ export default function Home() {
           onSave={saveWish}
           onDelete={removeWish}
           onAddStatus={addWishStatus}
+          onMoveToCloset={moveWishToCloset}
+          onJudge={judgeWish}
         />
       )}
     </div>

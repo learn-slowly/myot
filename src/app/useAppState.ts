@@ -474,6 +474,35 @@ JSON만 반환:
     setEditingWish(null); fetchData();
   };
 
+  // 찜 = 인박스. 여기서 옷장으로 졸업시키거나 살/말 판단으로 보냄.
+  const guessCat = (note?: string): CategoryKey => {
+    if (note) for (const [k, label] of Object.entries(CATEGORIES)) if (note.includes(label)) return k as CategoryKey;
+    return "shortTees" as CategoryKey;
+  };
+  const moveWishToCloset = async (wish: WishItem) => {
+    // insert 성공을 확인한 뒤에만 찜에서 삭제 (실패 시 데이터 손실 방지)
+    const { error } = await supabase.from("clothing_items").insert({
+      id: `custom-${Date.now()}`, cat: guessCat(wish.note), name: wish.name,
+      image_url: wish.image_url || null, season: [], tags: [],
+    });
+    if (error) { alert(`옷장 추가에 실패했어요: ${error}`); return; }
+    await supabase.from("wish_items").delete().eq("id", wish.id);
+    setEditingWish(null);
+    await fetchData();
+    setView("closet");
+  };
+  const judgeWish = async (wish: WishItem) => {
+    if (!wish.image_url) return;
+    setEditingWish(null);
+    try {
+      const blob = await (await fetch(wish.image_url)).blob();
+      const dataUrl = await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(blob); });
+      setBuyImage(dataUrl);
+      setBuyResult(null);
+      setView("buyornot");
+    } catch { /* 이미지 로드 실패 시 무시 */ }
+  };
+
   // ─── BUY OR NOT (살/말) ─────────────────────────────────────────
   const analyzeBuyOrNot = async () => {
     if (!buyImage) return;
@@ -552,7 +581,7 @@ ${wardrobeSummary}
     generateCombosForItem, saveItem, deleteItem,
     handleItemImageUpload, handleImageUpload,
     analyzeOotd, saveOotdRecord, deleteOotdLog, saveOotdMemo, handleOotdPhotoUpload,
-    addWish, saveWish, addWishStatus, removeWish,
+    addWish, saveWish, addWishStatus, removeWish, moveWishToCloset, judgeWish,
     analyzeBuyOrNot,
   };
 }
