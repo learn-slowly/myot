@@ -71,8 +71,8 @@ export function OotdTab({ app }: { app: App }) {
               <button onClick={() => deleteOotdLog(log.id)} style={{ border: "none", background: "transparent", color: "#CCC", cursor: "pointer", fontSize: 14 }}>✕</button>
             </div>
             {log.image_url ? (
-              <div style={{ borderRadius: 10, overflow: "hidden", marginBottom: 8 }}>
-                <img src={log.image_url} alt={`OOTD ${log.date}`} style={{ width: "100%", maxHeight: 280, objectFit: "cover", display: "block" }} />
+              <div style={{ borderRadius: 10, overflow: "hidden", marginBottom: 8, aspectRatio: "4 / 5", background: "rgba(0,0,0,0.04)" }}>
+                <img src={log.image_url} alt={`OOTD ${log.date}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               </div>
             ) : (
               <button onClick={() => { setOotdPhotoTargetId(log.id); ootdPhotoInputRef.current?.click(); }} disabled={ootdPhotoUploading === log.id} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px dashed rgba(0,0,0,0.12)", background: "transparent", color: "#aaa", cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
