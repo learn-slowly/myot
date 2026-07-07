@@ -5,6 +5,7 @@ import exifr from "exifr";
 import { CATEGORIES, SEASONS, type Season, type Mood, type CategoryKey, type ClothingItem, type WishItem } from "@/data/closet";
 import { supabase } from "@/lib/db";
 import { getCurrentSeason, resizeImage } from "@/lib/utils";
+import { STYLE_CONTEXT, buildWardrobeSummary } from "@/lib/prompts";
 import type { DbCombo, OotdLog, SavedCombo, LetgoItem, WishStatus, Weather } from "@/types";
 
 export type View = "ootd" | "closet" | "combo" | "mood" | "buyornot" | "wishlist" | "letgo";
@@ -528,18 +529,14 @@ JSON만 반환:
         ? { image: (await resizeImage(buyImage, 1024)).split(",")[1], mediaType: "image/jpeg" }
         : { imageUrl: buyImage };
 
-      const wardrobeSummary = allItems.filter(i => i.cat !== "accessories").map(i =>
-        `${i.name}${i.color ? ` (${i.color})` : ""}${i.brand ? ` [${i.brand}]` : ""} — ${CATEGORIES[i.cat]}${i.season ? ` [${i.season.map(s => SEASONS[s]).join("/")}]` : ""}`
-      ).join("\n");
+      const wardrobeSummary = buildWardrobeSummary(allItems);
 
       const prompt = `사진 속 옷에 대해 "살까 말까" 판단을 해줘.
 
 현재 옷장:
 ${wardrobeSummary}
 
-스타일 축: 워크웨어, 아이비/프레피, 힙합 캐주얼
-퍼스널컬러: 웜톤 가을(Autumn) — 어스톤 컬러(브라운, 카키, 샌드베이지, 머스터드)
-개인 원칙: 빼입기 선호, 안 입는 옷 사지 않기, 모자 안 씀, 노란색은 어렵다(머스터드가 한계)
+${STYLE_CONTEXT}
 
 분석해줄 것:
 1. 중복 체크: 옷장에 비슷한 아이템이 있는지
