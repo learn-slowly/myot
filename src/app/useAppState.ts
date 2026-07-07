@@ -6,7 +6,7 @@ import { CATEGORIES, SEASONS, type Season, type Mood, type CategoryKey, type Clo
 import { supabase } from "@/lib/db";
 import { getCurrentSeason, resizeImage } from "@/lib/utils";
 import { STYLE_CONTEXT, buildWardrobeSummary } from "@/lib/prompts";
-import type { DbCombo, OotdLog, SavedCombo, LetgoItem, WishStatus, Weather } from "@/types";
+import type { DbCombo, OotdLog, SavedCombo, LetgoItem, WishStatus, Weather, CompareResult, CompareCandidate } from "@/types";
 
 export type View = "ootd" | "closet" | "combo" | "mood" | "buyornot" | "wishlist" | "letgo";
 
@@ -66,6 +66,13 @@ export function useAppState() {
   const [buyAnalyzing, setBuyAnalyzing] = useState(false);
   const [buyResult, setBuyResult] = useState<{ verdict: string; emoji: string; analysis: string; itemName: string } | null>(null);
   const buyFileRef = useRef<HTMLInputElement>(null);
+
+  // 여러 개 비교 (가성비) state
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareSelection, setCompareSelection] = useState<Set<string>>(new Set());
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
+  const [compareItems, setCompareItems] = useState<WishItem[]>([]);
 
   // Local state
   const [savedCombos, setSavedCombos] = useState<SavedCombo[]>([]);
@@ -158,6 +165,14 @@ export function useAppState() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // 찜 탭을 벗어나면 비교 모드/선택 초기화
+  useEffect(() => {
+    if (view !== "wishlist" && compareMode) {
+      setCompareMode(false);
+      setCompareSelection(new Set());
+    }
+  }, [view, compareMode]);
 
   // ─── Weather (Open-Meteo) ───────────────────────────────────────
   useEffect(() => {
@@ -566,6 +581,72 @@ ${STYLE_CONTEXT}
     setBuyAnalyzing(false);
   };
 
+  // ─── 여러 개 비교 (가성비) ─────────────────────────────────────
+  const enterCompareMode = (seedId?: string) => {
+    setCompareMode(true);
+    setCompareSelection(seedId ? new Set([seedId]) : new Set());
+  };
+  const cancelCompare = () => {
+    setCompareMode(false);
+    setCompareSelection(new Set());
+  };
+  const toggleCompareSelect = (id: string) => {
+    setCompareSelection(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else { if (next.size >= 5) return prev; next.add(id); }
+      return next;
+    });
+  };
+  const closeCompareResult = () => {
+    setCompareResult(null);
+    setCompareItems([]);
+  };
+  const runCompare = async () => {
+    const items = wishlist.filter(w => compareSelection.has(w.id));
+    if (items.length < 2) return;
+    setCompareItems(items);
+    setCompareMode(false);
+    setCompareSelection(new Set());
+    setCompareResult(null);
+    setCompareLoading(true);
+    try {
+      const candidates: CompareCandidate[] = items.map(w => ({
+        name: w.name,
+        price: w.price,
+        note: w.note || undefined,
+        imageUrl: w.image_url,
+      }));
+      const instruction = `아래 후보들은 내가 살까 고민 중인 옷이야. 내 옷장과 스타일을 기준으로 "가성비(가격 대비 활용도)" 순위를 매겨줘.
+
+현재 옷장:
+${buildWardrobeSummary(allItems)}
+
+${STYLE_CONTEXT}
+
+판단 기준: 가격 대비 활용도. 옷장에 새 조합을 얼마나 만들어주는지, 비슷한 게 이미 있는지(중복), 스타일·색이 맞는지를 가격과 함께 저울질해. 비싼데 활용도 낮으면 순위가 낮고, 싼데 활용도 높으면 위. 셋 다 별로면 summary에 사지 말라고 적어. name은 내가 준 후보 이름을 그대로 써.
+
+답변 형식 (JSON만, 다른 말 없이):
+{"ranking": [{"rank": 1, "name": "후보 이름", "reason": "가성비 관점 한 줄 이유"}], "topPick": "1위 이름", "summary": "종합 한마디 (한국어 1-2문장)"}`;
+
+      const res = await fetch("/api/compare", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidates, instruction }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      const text = data.content?.map((c: { text?: string }) => c.text || "").join("") || "";
+      const clean = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(clean) as CompareResult;
+      setCompareResult(parsed);
+    } catch (err) {
+      console.error("Compare error:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setCompareResult({ ranking: [], topPick: "", summary: `비교에 실패했어: ${msg}` });
+    }
+    setCompareLoading(false);
+  };
+
   return {
     view, setView,
     comboSelections, setComboSelections,
@@ -597,5 +678,7 @@ ${STYLE_CONTEXT}
     analyzeOotd, saveOotdRecord, deleteOotdLog, saveOotdMemo, handleOotdPhotoUpload,
     addWish, saveWish, addWishStatus, removeWish, moveWishToCloset, judgeWish,
     analyzeBuyOrNot,
+    compareMode, compareSelection, compareLoading, compareResult, compareItems,
+    enterCompareMode, cancelCompare, toggleCompareSelect, runCompare, closeCompareResult,
   };
 }
