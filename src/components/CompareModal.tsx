@@ -31,16 +31,16 @@ export function CompareModal({ result, loading, items, onClose }: {
         )}
 
         {!loading && result && rows.length === 0 && (
-          <div style={{ fontSize: 13, color: "#E85D5D", padding: "12px 4px", lineHeight: 1.6 }}>{result.summary}</div>
+          <div style={{ fontSize: 13, color: "#E85D5D", padding: "12px 4px", lineHeight: 1.6 }}>{result.summary || "비교 결과를 불러오지 못했어요."}</div>
         )}
 
         {!loading && result && rows.length > 0 && (
           <div>
-            {rows.map(row => {
+            {rows.map((row, i) => {
               const w = byName(row.name);
               const isTop = row.rank === 1;
               return (
-                <div key={row.rank} style={{ background: isTop ? "rgba(196,149,43,0.1)" : "rgba(255,255,255,0.7)", border: `1px solid ${isTop ? "rgba(196,149,43,0.3)" : "rgba(0,0,0,0.06)"}`, borderRadius: 12, padding: "12px 14px", marginBottom: 8 }}>
+                <div key={`${row.rank}-${i}`} style={{ background: isTop ? "rgba(196,149,43,0.1)" : "rgba(255,255,255,0.7)", border: `1px solid ${isTop ? "rgba(196,149,43,0.3)" : "rgba(0,0,0,0.06)"}`, borderRadius: 12, padding: "12px 14px", marginBottom: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color: isTop ? "#C4952B" : "#888", flexShrink: 0 }}>{isTop ? "🏆 1위" : `${row.rank}위`}</span>
                     <span style={{ fontSize: 13, fontWeight: 600, color: "#2A2A2A", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.name}</span>

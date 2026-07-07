@@ -63,6 +63,7 @@ export function WishlistTab({ app }: { app: App }) {
               onPointerUp={clearLongPress}
               onPointerLeave={clearLongPress}
               onPointerMove={clearLongPress}
+              onPointerCancel={clearLongPress}
               style={{ background: selected ? "rgba(107,45,62,0.08)" : "rgba(255,255,255,0.7)", borderRadius: 12, padding: "12px 16px", marginBottom: 6, border: `1px solid ${selected ? "rgba(107,45,62,0.35)" : "rgba(0,0,0,0.06)"}`, cursor: "pointer", userSelect: "none", touchAction: "manipulation" }}>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 {compareMode && <span style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${selected ? "#6B2D3E" : "rgba(0,0,0,0.2)"}`, background: selected ? "#6B2D3E" : "transparent", color: "#fff", fontSize: 12, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{selected ? "✓" : ""}</span>}
