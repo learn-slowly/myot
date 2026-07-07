@@ -45,3 +45,22 @@ export interface Weather {
   desc: string;
   icon: string;
 }
+
+export interface CompareCandidate {
+  name: string;
+  price?: string;
+  note?: string;
+  imageUrl?: string;
+}
+
+export interface CompareRankingRow {
+  rank: number;
+  name: string;
+  reason: string;
+}
+
+export interface CompareResult {
+  ranking: CompareRankingRow[];
+  topPick: string;
+  summary: string;
+}
