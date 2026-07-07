@@ -94,7 +94,7 @@ export default function Home() {
         />
       )}
 
-      {/* 가성비 비교 결과 모달 */}
+      {/* 살/말 비교 결과 모달 */}
       {(compareLoading || compareResult) && (
         <CompareModal
           result={compareResult}

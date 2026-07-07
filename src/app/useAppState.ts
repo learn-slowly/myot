@@ -617,17 +617,17 @@ ${STYLE_CONTEXT}
         note: w.note || undefined,
         imageUrl: w.image_url,
       }));
-      const instruction = `아래 후보들은 내가 살까 고민 중인 옷이야. 내 옷장과 스타일을 기준으로 "가성비(가격 대비 활용도)" 순위를 매겨줘.
+      const instruction = `아래 후보들은 내가 살까 고민 중인 옷이야. 각각을 내 옷장과 스타일 기준으로 "살까/말까" 판정해줘.
 
 현재 옷장:
 ${buildWardrobeSummary(allItems)}
 
 ${STYLE_CONTEXT}
 
-판단 기준: 가격 대비 활용도. 옷장에 새 조합을 얼마나 만들어주는지, 비슷한 게 이미 있는지(중복), 스타일·색이 맞는지를 가격과 함께 저울질해. 비싼데 활용도 낮으면 순위가 낮고, 싼데 활용도 높으면 위. 셋 다 별로면 summary에 사지 말라고 적어. name은 내가 준 후보 이름을 그대로 써.
+각 후보마다 중복(비슷한 게 이미 있나)·활용도(새 조합이 얼마나 늘어나나)·스타일/색 적합·가격을 따져 "살" / "고민" / "말" 중 하나로 판정하고 한 줄 이유를 써. 그다음 이 후보들 중 그래도 하나만 산다면 뭐가 제일 나은지 topPick으로 골라(살/고민 중에서. 전부 말이면 빈 문자열 ""). name은 내가 준 후보 이름을 그대로 써.
 
 답변 형식 (JSON만, 다른 말 없이):
-{"ranking": [{"rank": 1, "name": "후보 이름", "reason": "가성비 관점 한 줄 이유"}], "topPick": "1위 이름", "summary": "종합 한마디 (한국어 1-2문장)"}`;
+{"items": [{"name": "후보 이름", "verdict": "살" 또는 "고민" 또는 "말", "reason": "한 줄 이유"}], "topPick": "하나만 산다면 그 이름 (없으면 "")", "summary": "종합 한마디 (한국어 1-2문장)"}`;
 
       const res = await fetch("/api/compare", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -642,7 +642,7 @@ ${STYLE_CONTEXT}
     } catch (err) {
       console.error("Compare error:", err);
       const msg = err instanceof Error ? err.message : String(err);
-      setCompareResult({ ranking: [], topPick: "", summary: `비교에 실패했어: ${msg}` });
+      setCompareResult({ items: [], topPick: "", summary: `비교에 실패했어: ${msg}` });
     }
     setCompareLoading(false);
   };

@@ -53,14 +53,14 @@ export interface CompareCandidate {
   imageUrl?: string;
 }
 
-export interface CompareRankingRow {
-  rank: number;
+export interface CompareVerdictRow {
   name: string;
+  verdict: string; // "살" | "고민" | "말"
   reason: string;
 }
 
 export interface CompareResult {
-  ranking: CompareRankingRow[];
-  topPick: string;
+  items: CompareVerdictRow[];
+  topPick: string; // 살/고민 중 하나만 산다면 이것 (전부 말이면 빈 문자열)
   summary: string;
 }
