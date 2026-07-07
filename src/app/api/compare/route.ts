@@ -29,10 +29,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
   }
 
-  const { candidates, instruction } = (await req.json()) as {
-    candidates: CompareCandidate[];
-    instruction: string;
-  };
+  let candidates: CompareCandidate[];
+  let instruction: string;
+  try {
+    const body = (await req.json()) as { candidates: CompareCandidate[]; instruction: string };
+    candidates = body.candidates;
+    instruction = body.instruction;
+  } catch {
+    return NextResponse.json({ error: "잘못된 요청 형식" }, { status: 400 });
+  }
   if (!Array.isArray(candidates) || candidates.length < 2) {
     return NextResponse.json({ error: "후보가 2개 이상 필요해요" }, { status: 400 });
   }
@@ -58,20 +63,26 @@ export async function POST(req: NextRequest) {
   });
   content.push({ type: "text", text: instruction });
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-5",
-      max_tokens: 4000,
-      thinking: { type: "adaptive" },
-      messages: [{ role: "user", content }],
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-5",
+        max_tokens: 4000,
+        thinking: { type: "adaptive" },
+        messages: [{ role: "user", content }],
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+  } catch {
+    return NextResponse.json({ error: "AI 비교 요청에 실패했어요 (네트워크)" }, { status: 502 });
+  }
 
   if (!response.ok) {
     return NextResponse.json({ error: `Anthropic API error: ${response.status}` }, { status: response.status });
