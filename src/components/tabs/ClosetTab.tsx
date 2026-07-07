@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { CATEGORIES, SEASONS, TAG_COLORS, type Season, type ClothingItem } from "@/data/closet";
+import { OrderImportModal } from "@/components/OrderImportModal";
 import { getCurrentSeason } from "@/lib/utils";
 import { supabase } from "@/lib/db";
 import type { App } from "@/app/useAppState";
@@ -274,11 +276,14 @@ export function ClosetTab({ app }: { app: App }) {
     expandedCat, setExpandedCat,
     setEditingItem, setAddingItem, setImageTargetId, itemImageInputRef,
   } = app;
+  const [showImport, setShowImport] = useState(false);
 
   return (
     <div>
       {imageUploading && <div style={{ padding: "8px 16px", marginBottom: 12, borderRadius: 10, background: "rgba(196,149,43,0.1)", border: "1px solid rgba(196,149,43,0.2)", fontSize: 12, color: "#C4952B", textAlign: "center" }}>사진 업로드 중...</div>}
       {generatingCombos && <div style={{ padding: "8px 16px", marginBottom: 12, borderRadius: 10, background: "rgba(107,45,62,0.08)", border: "1px solid rgba(107,45,62,0.15)", fontSize: 12, color: "#6B2D3E", textAlign: "center" }}>AI가 새 아이템으로 코디 조합 만드는 중...</div>}
+      <button onClick={() => setShowImport(true)} style={{ width: "100%", marginBottom: 10, padding: 11, borderRadius: 10, border: "1.5px dashed rgba(107,45,62,0.25)", background: "rgba(107,45,62,0.03)", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500, color: "#6B2D3E" }}>📥 주문내역으로 한번에 추가</button>
+      {showImport && <OrderImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); fetchData(); }} />}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
         <button onClick={() => setShowClosetStats(!showClosetStats)} style={{ fontSize: 12, color: "#6B2D3E", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>{showClosetStats ? "통계 접기 ▲" : "옷장 통계 ▼"}</button>
       </div>

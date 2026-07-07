@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { CATEGORIES } from "@/data/closet";
+import { CATEGORIES, SEASONS, type Season } from "@/data/closet";
 import { supabase } from "@/lib/db";
 import { resizeImage } from "@/lib/utils";
 
@@ -10,10 +10,17 @@ type Parsed = {
   name: string; brand?: string | null; color?: string | null; size?: string | null;
   price?: string | null; purchased_at?: string | null; category?: string | null; is_clothing?: boolean;
   image_index?: number; box?: Box;
-  _include: boolean; _photo: string | null; // 크롭된 dataURL
+  _include: boolean; _photo: string | null; _season: Season[]; // 크롭된 dataURL·시즌
 };
 
 const CAT_LABEL = (c?: string | null) => (c && (CATEGORIES as Record<string, string>)[c]) || "기타";
+
+// "29,890원" 같은 문자열 → 숫자(원). 실패 시 null
+function parsePrice(s?: string | null): number | null {
+  if (!s) return null;
+  const n = parseInt(String(s).replace(/[^0-9]/g, ""), 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 // 원본 스크린샷 dataURL에서 정규화 박스로 정사각 크롭
 function cropFromImage(dataUrl: string, box: Box): Promise<string> {
@@ -79,7 +86,7 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
         if (it.box && it.box.w > 0.01 && it.box.h > 0.01 && images[idx]) {
           try { photo = await cropFromImage(images[idx], it.box); } catch {}
         }
-        return { ...it, _include: it.is_clothing !== false, _photo: photo };
+        return { ...it, _include: it.is_clothing !== false, _photo: photo, _season: [] as Season[] };
       }));
       setItems(parsed);
     } catch (e) {
@@ -93,7 +100,7 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
     const chosen = items.filter(i => i._include);
     if (!chosen.length) return;
     setSaving(true);
-    const rows = await Promise.all(chosen.map(async (i) => {
+    const rows = await Promise.all(chosen.map(async (i, idx) => {
       let image_url: string | null = null;
       if (i._photo) {
         try {
@@ -102,12 +109,18 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
           if (res.ok) image_url = d.url;
         } catch {}
       }
+      // parse-orders가 category를 CATEGORIES 키로 반환 → 그대로 cat에. 없으면 accessories
+      const cat = i.category && (CATEGORIES as Record<string, string>)[i.category] ? i.category : "accessories";
       return {
-        name: i.name, price: i.price || null, status: "watch", image_url,
-        note: ["주문내역", CAT_LABEL(i.category), i.size || null, i.purchased_at ? `구매 ${i.purchased_at}` : null].filter(Boolean).join(" · "),
+        id: `custom-${Date.now()}-${idx}`,
+        cat, name: i.name,
+        brand: i.brand || null, color: i.color || null, size: i.size || null,
+        price: parsePrice(i.price), purchased_at: i.purchased_at || null,
+        acquired_via: "new", image_url,
+        season: i._season, tags: [],
       };
     }));
-    await supabase.from("wish_items").insert(rows);
+    await supabase.from("clothing_items").insert(rows);
     setSaving(false);
     onDone();
   };
@@ -130,7 +143,7 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", background: "linear-gradient(160deg, #F5F0E1, #E8E0D0)", borderRadius: "20px 20px 0 0", padding: "20px 16px 32px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: "#2A2A2A" }}>주문내역으로 찜 채우기</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: "#2A2A2A" }}>주문내역으로 옷장 채우기</span>
           <button onClick={onClose} style={{ border: "none", background: "transparent", fontSize: 18, cursor: "pointer", color: "#888" }}>✕</button>
         </div>
 
@@ -155,7 +168,7 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
           </>
         ) : (
           <>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 10, lineHeight: 1.5 }}>{items.length}개 발견 · 넣을 것만 체크. 옷 아닌 잡화는 미리 빼놨어. 사진이 엉뚱하면 ✕로 빼고, 빈 칸을 눌러 직접 넣어도 돼.</div>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 10, lineHeight: 1.5 }}>{items.length}개 발견 · 넣을 것만 체크. 옷 아닌 잡화는 미리 빼놨어. 사진이 엉뚱하면 ✕로 빼고, 빈 칸을 눌러 직접 넣어도 돼. 시즌은 아이템마다 골라줘(안 골라도 됨).</div>
             <input ref={itemPhotoRef} type="file" accept="image/*" onChange={addPhotoForItem} style={{ display: "none" }} />
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
               {items.map((it, i) => (
@@ -178,13 +191,21 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
                       <input value={it.price || ""} onChange={e => update(i, { price: e.target.value })} placeholder="가격" style={{ ...field, flex: 1 }} />
                       <span style={{ fontSize: 10, color: "#888", alignSelf: "center", flexShrink: 0 }}>{CAT_LABEL(it.category)}{it.is_clothing === false ? "·잡화" : ""}</span>
                     </div>
+                    <div style={{ display: "flex", gap: 4, marginTop: 5 }}>
+                      {(["spring", "summer", "fall", "winter"] as Season[]).map(s => {
+                        const on = it._season.includes(s);
+                        return (
+                          <button key={s} type="button" onClick={() => update(i, { _season: on ? it._season.filter(x => x !== s) : [...it._season, s] })} style={{ flex: 1, padding: "3px 0", borderRadius: 6, border: `1px solid ${on ? "#6B2D3E" : "rgba(0,0,0,0.12)"}`, background: on ? "#6B2D3E" : "transparent", color: on ? "#fff" : "#999", fontSize: 10, cursor: "pointer", fontFamily: "inherit" }}>{SEASONS[s]}</button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => { setItems(null); setError(null); }} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 12, fontFamily: "inherit", color: "#888" }}>다시</button>
-              <button onClick={save} disabled={saving || !items.some(i => i._include)} style={{ flex: 2, padding: 11, borderRadius: 10, border: "none", background: saving ? "#B0A090" : "#6B2D3E", color: "#fff", cursor: saving ? "default" : "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>{saving ? "추가 중..." : `${items.filter(i => i._include).length}개 찜에 추가`}</button>
+              <button onClick={save} disabled={saving || !items.some(i => i._include)} style={{ flex: 2, padding: 11, borderRadius: 10, border: "none", background: saving ? "#B0A090" : "#6B2D3E", color: "#fff", cursor: saving ? "default" : "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>{saving ? "추가 중..." : `${items.filter(i => i._include).length}개 옷장에 추가`}</button>
             </div>
           </>
         )}
