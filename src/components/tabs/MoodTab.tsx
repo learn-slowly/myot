@@ -1,6 +1,7 @@
 "use client";
 
-import { SEASONS, MOODS, type Season, type Mood } from "@/data/closet";
+import { useState } from "react";
+import { SEASONS, MOODS, type Season, type Mood, type ClothingItem } from "@/data/closet";
 import { getCurrentSeason } from "@/lib/utils";
 import type { App } from "@/app/useAppState";
 import { ColorDot } from "@/components/ColorDot";
@@ -11,7 +12,9 @@ export function MoodTab({ app }: { app: App }) {
     weather, weatherLoading, selectedSeason, setSelectedSeason,
     selectedMood, setSelectedMood, refreshKey, setRefreshKey,
     combos, ootdLogs, getItem, allItems, wearData,
+    generateCombosForItem, generatingCombos,
   } = app;
+  const [focusItem, setFocusItem] = useState<ClothingItem | null>(null);
 
   // 기온 → 시즌 자동 판단
   const weatherSeason: Season | null = weather ? (
@@ -23,6 +26,14 @@ export function MoodTab({ app }: { app: App }) {
   const isRainy = weather && (weather.desc.includes("비") || weather.desc.includes("소나기") || weather.desc.includes("뇌우") || weather.desc.includes("이슬비"));
 
   const filtered = combos.filter(c => c.season.includes(moodSeason) && (!selectedMood || c.mood.includes(selectedMood)));
+
+  // 뜸한 옷 클릭 → 그 옷이 들어간 조합만 (없으면 AI 생성)
+  const comboHasItem = (c: typeof combos[number], id: string) => [c.bottom, ...c.tops, ...c.outers, ...c.shoes].includes(id);
+  const focusCombos = focusItem ? combos.filter(c => comboHasItem(c, focusItem.id)).slice(0, 5) : [];
+  const selectNeglected = (item: ClothingItem) => {
+    setFocusItem(item);
+    if (!combos.some(c => comboHasItem(c, item.id))) generateCombosForItem(item);
+  };
 
   // 비 오면 비 관련 신발 우선 정렬
   const sorted = [...filtered];
@@ -82,15 +93,16 @@ export function MoodTab({ app }: { app: App }) {
         if (neglected.length < 2) return null;
         return (
           <div style={{ background: "rgba(196,149,43,0.06)", borderRadius: 14, padding: "12px 16px", marginBottom: 16, border: "1px solid rgba(196,149,43,0.15)" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#C4952B", marginBottom: 8 }}>요즘 뜸했던 옷 — 오늘 살려볼까?</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#C4952B", marginBottom: 8 }}>요즘 뜸했던 옷 — 오늘 살려볼까? <span style={{ fontWeight: 400, fontSize: 10, color: "#B0A090" }}>(탭해서 코디 보기)</span></div>
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               {neglected.map(({ i, last }) => {
                 const days = Math.floor((now - new Date(last!).getTime()) / 86400000);
                 return (
-                  <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div key={i.id} onClick={() => selectNeglected(i)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "5px 6px", margin: "0 -6px", borderRadius: 8, background: focusItem?.id === i.id ? "rgba(196,149,43,0.18)" : "transparent" }}>
                     {i.image_url ? <img src={i.image_url} alt={i.name} style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} /> : i.color ? <ColorDot color={i.color} size={16} /> : null}
                     <span style={{ flex: 1, fontSize: 12, color: "#2A2A2A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.name}</span>
                     <span style={{ fontSize: 10, color: "#C4952B", flexShrink: 0 }}>{days}일째</span>
+                    <span style={{ fontSize: 12, color: "#C4952B", flexShrink: 0 }}>›</span>
                   </div>
                 );
               })}
@@ -99,12 +111,20 @@ export function MoodTab({ app }: { app: App }) {
         );
       })()}
 
-      <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>
-        {SEASONS[moodSeason]} · {selectedMood ? MOODS[selectedMood] : "전체"} — {filtered.length}개 조합
-        {isRainy && <span style={{ marginLeft: 6, color: "#5A7BA0" }}>🌧 비 오는 날 추천</span>}
-      </div>
+      {focusItem ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#C4952B" }}>👕 {focusItem.name} 살리는 코디</span>
+          <button onClick={() => setFocusItem(null)} style={{ fontSize: 12, color: "#888", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>✕ 해제</button>
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>
+          {SEASONS[moodSeason]} · {selectedMood ? MOODS[selectedMood] : "전체"} — {filtered.length}개 조합
+          {isRainy && <span style={{ marginLeft: 6, color: "#5A7BA0" }}>🌧 비 오는 날 추천</span>}
+        </div>
+      )}
+      {focusItem && generatingCombos && <div style={{ textAlign: "center", padding: 30, color: "#C4952B", fontSize: 13 }}>이 옷으로 코디 만드는 중...</div>}
 
-      {shuffled.map((combo) => {
+      {(focusItem ? focusCombos : shuffled).map((combo) => {
         const bottom = getItem(combo.bottom);
         return (
           <div key={combo.id} style={{ background: "rgba(255,255,255,0.7)", borderRadius: 14, padding: 16, marginBottom: 10, border: "1px solid rgba(0,0,0,0.06)" }}>
@@ -119,8 +139,9 @@ export function MoodTab({ app }: { app: App }) {
           </div>
         );
       })}
-      {!shuffled.length && <div style={{ textAlign: "center", padding: 30, color: "#888", fontSize: 13 }}>조건에 맞는 조합이 없어!</div>}
-      {filtered.length > 3 && <button onClick={() => setRefreshKey(r => r + 1)} style={{ width: "100%", padding: 12, border: "1.5px dashed rgba(0,0,0,0.15)", borderRadius: 12, background: "transparent", cursor: "pointer", color: "#888", fontSize: 13, fontFamily: "inherit", marginTop: 4 }}>다른 조합 보기 ↻</button>}
+      {focusItem && !generatingCombos && focusCombos.length === 0 && <div style={{ textAlign: "center", padding: 30, color: "#888", fontSize: 13 }}>이 옷으로 만들 조합을 찾지 못했어.</div>}
+      {!focusItem && !shuffled.length && <div style={{ textAlign: "center", padding: 30, color: "#888", fontSize: 13 }}>조건에 맞는 조합이 없어!</div>}
+      {!focusItem && filtered.length > 3 && <button onClick={() => setRefreshKey(r => r + 1)} style={{ width: "100%", padding: 12, border: "1.5px dashed rgba(0,0,0,0.15)", borderRadius: 12, background: "transparent", cursor: "pointer", color: "#888", fontSize: 13, fontFamily: "inherit", marginTop: 4 }}>다른 조합 보기 ↻</button>}
     </div>
   );
 }
