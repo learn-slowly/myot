@@ -12,6 +12,7 @@ import { BuyOrNotTab } from "@/components/tabs/BuyOrNotTab";
 import { WishlistTab } from "@/components/tabs/WishlistTab";
 import { LetgoTab } from "@/components/tabs/LetgoTab";
 import { UpdateBanner } from "@/components/UpdateBanner";
+import { CompareModal } from "@/components/CompareModal";
 
 export default function Home() {
   const app = useAppState();
@@ -21,6 +22,7 @@ export default function Home() {
     editingItem, setEditingItem, addingItem, setAddingItem,
     saveItem, deleteItem, generateCombosForItem, customCats, fetchData,
     editingWish, setEditingWish, wishStatuses, saveWish, removeWish, addWishStatus, moveWishToCloset, judgeWish,
+    compareResult, compareLoading, compareItems, closeCompareResult,
   } = app;
 
   if (loading) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#888", fontSize: 14 }}>로딩 중...</div>;
@@ -89,6 +91,16 @@ export default function Home() {
           onAddStatus={addWishStatus}
           onMoveToCloset={moveWishToCloset}
           onJudge={judgeWish}
+        />
+      )}
+
+      {/* 가성비 비교 결과 모달 */}
+      {(compareLoading || compareResult) && (
+        <CompareModal
+          result={compareResult}
+          loading={compareLoading}
+          items={compareItems}
+          onClose={closeCompareResult}
         />
       )}
     </div>
