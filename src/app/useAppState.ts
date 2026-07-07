@@ -73,6 +73,8 @@ export function useAppState() {
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
   const [compareItems, setCompareItems] = useState<WishItem[]>([]);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  const compareAbortRef = useRef<AbortController | null>(null);
 
   // Local state
   const [savedCombos, setSavedCombos] = useState<SavedCombo[]>([]);
@@ -599,16 +601,26 @@ ${STYLE_CONTEXT}
     });
   };
   const closeCompareResult = () => {
+    // 로딩 중이면 진행 중인 /api/compare 요청 취소
+    compareAbortRef.current?.abort();
+    compareAbortRef.current = null;
+    setCompareLoading(false);
     setCompareResult(null);
+    setCompareError(null);
     setCompareItems([]);
   };
-  const runCompare = async () => {
-    const items = wishlist.filter(w => compareSelection.has(w.id));
+  // 실제 비교 실행부 — 선택분(runCompare)·재시도(retryCompare) 공용
+  const executeCompare = async (items: WishItem[]) => {
     if (items.length < 2) return;
+    // 이전 요청이 남아 있으면 취소하고 새 컨트롤러로 교체
+    compareAbortRef.current?.abort();
+    const ac = new AbortController();
+    compareAbortRef.current = ac;
     setCompareItems(items);
     setCompareMode(false);
     setCompareSelection(new Set());
     setCompareResult(null);
+    setCompareError(null);
     setCompareLoading(true);
     try {
       const candidates: CompareCandidate[] = items.map(w => ({
@@ -632,19 +644,29 @@ ${STYLE_CONTEXT}
       const res = await fetch("/api/compare", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ candidates, instruction }),
+        signal: ac.signal,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || `요청 실패 (${res.status})`);
       const text = data.content?.map((c: { text?: string }) => c.text || "").join("") || "";
       const clean = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean) as CompareResult;
       setCompareResult(parsed);
     } catch (err) {
+      // 사용자가 로딩 중 모달을 닫아 abort된 경우는 조용히 종료 (closeCompareResult가 정리함)
+      if (ac.signal.aborted) return;
       console.error("Compare error:", err);
-      const msg = err instanceof Error ? err.message : String(err);
-      setCompareResult({ items: [], topPick: "", summary: `비교에 실패했어: ${msg}` });
+      setCompareError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (!ac.signal.aborted) setCompareLoading(false);
+      if (compareAbortRef.current === ac) compareAbortRef.current = null;
     }
-    setCompareLoading(false);
+  };
+  const runCompare = () => {
+    executeCompare(wishlist.filter(w => compareSelection.has(w.id)));
+  };
+  const retryCompare = () => {
+    if (compareItems.length >= 2) executeCompare(compareItems);
   };
 
   return {
@@ -678,7 +700,7 @@ ${STYLE_CONTEXT}
     analyzeOotd, saveOotdRecord, deleteOotdLog, saveOotdMemo, handleOotdPhotoUpload,
     addWish, saveWish, addWishStatus, removeWish, moveWishToCloset, judgeWish,
     analyzeBuyOrNot,
-    compareMode, compareSelection, compareLoading, compareResult, compareItems,
-    enterCompareMode, cancelCompare, toggleCompareSelect, runCompare, closeCompareResult,
+    compareMode, compareSelection, compareLoading, compareResult, compareItems, compareError,
+    enterCompareMode, cancelCompare, toggleCompareSelect, runCompare, retryCompare, closeCompareResult,
   };
 }

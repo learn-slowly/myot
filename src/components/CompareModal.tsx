@@ -7,11 +7,13 @@ import type { CompareResult } from "@/types";
 const VERDICT_EMOJI: Record<string, string> = { "살": "🟢", "고민": "🟡", "말": "🔴" };
 const VERDICT_ORDER: Record<string, number> = { "살": 0, "고민": 1, "말": 2 };
 
-export function CompareModal({ result, loading, items, onClose }: {
+export function CompareModal({ result, loading, error, items, onClose, onRetry }: {
   result: CompareResult | null;
   loading: boolean;
+  error: string | null;
   items: WishItem[];
   onClose: () => void;
+  onRetry: () => void;
 }) {
   // AI가 준 name을 비교한 실제 찜에 매칭 → 가격·사진유무·링크는 원본 데이터로 표시
   const byName = (name: string) => items.find(w => w.name.trim() === name.trim());
@@ -36,7 +38,21 @@ export function CompareModal({ result, loading, items, onClose }: {
           </div>
         )}
 
-        {!loading && result && rows.length === 0 && (
+        {!loading && error && (
+          <div>
+            <div style={{ textAlign: "center", padding: "24px 8px 16px" }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>😵</div>
+              <div style={{ fontSize: 13, color: "#E85D5D", lineHeight: 1.6 }}>비교에 실패했어요.</div>
+              <div style={{ fontSize: 11, color: "#999", marginTop: 6, wordBreak: "break-word", lineHeight: 1.5 }}>{error}</div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={onRetry} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#6B2D3E", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>다시 시도</button>
+              <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", color: "#888" }}>닫기</button>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && result && rows.length === 0 && (
           <div style={{ fontSize: 13, color: "#E85D5D", padding: "12px 4px", lineHeight: 1.6 }}>{result.summary || "비교 결과를 불러오지 못했어요."}</div>
         )}
 
