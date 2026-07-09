@@ -9,7 +9,7 @@ const PROMPT = `이미지들은 온라인 쇼핑몰(무신사·네이버·29cm·
 - size: 사이즈 옵션 (없으면 null)
 - price: 실제 결제 금액을 "숫자,단위원" 형태로 (예: "29,890원"). 취소선 그은 원가 말고 결제가.
 - purchased_at: 구매확정일/주문일을 YYYY-MM-DD로 (화면의 날짜에서)
-- category: 다음 중 가장 가까운 것으로 추론 [bottoms, shirts, poloTees, shortTees, longTees, knits, hoodies, outerWinter, outerSpringFall, outerSummer, shoes, bags, hats, scarves, accessories]. 애매하면 accessories.
+- category: 다음 키 중 가장 가까운 것 하나를 골라 그 "키"로만 답해(괄호 안은 뜻): bottoms(하의), shirts(긴팔 셔츠), blouses(블라우스), knits(니트/가디건), hoodies(후디), longTees(긴팔 티셔츠), shortTees(반팔 라운드티), poloTees(반팔 카라티/피케), outerWinter(겨울 아우터·패딩·코트·두꺼운 재킷), outerSpringFall(봄가을 아우터·블레이저·바람막이·재킷), outerSummer(여름용 얇은 아우터), dresses(원피스/드레스), skirts(스커트), shoes(신발), bags(가방·백팩), hats(모자/캡), jewelry(주얼리·반지·목걸이), watches(시계), scarves(머플러/스카프/타이). 위에 정말 안 맞는 잡화만 accessories(소품). 옷·신발·가방은 절대 accessories로 몰지 말고 위 옷 카테고리 중에서 골라.
 - is_clothing: 옷/신발/가방 등 착용 아이템이면 true, 키링·폰케이스·상품권 같은 잡화면 false
 - image_index: 이 상품이 몇 번째 이미지에 있는지 (0부터 시작하는 정수)
 - box: 그 이미지 안에서 이 상품의 "썸네일 제품 사진"에만 딱 맞는 사각형. 각 주문 항목의 왼쪽에 있는 정사각형 제품 이미지야. 옆의 상품명 텍스트·가격·버튼·여백·다른 상품은 절대 포함하지 마 — 제품 사진의 네 변에 타이트하게. 이미지 좌상단 (0,0), 우하단 (1,1) 정규화 좌표로 {"x":좌상단x, "y":좌상단y, "w":너비, "h":높이}. 세로 위치를 특히 정확히 맞춰줘.

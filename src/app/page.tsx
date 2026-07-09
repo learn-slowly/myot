@@ -85,6 +85,7 @@ export default function Home() {
         <WishEditModal
           wish={editingWish}
           wishStatuses={wishStatuses}
+          customCats={customCats}
           onClose={() => setEditingWish(null)}
           onSave={saveWish}
           onDelete={removeWish}

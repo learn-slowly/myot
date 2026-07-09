@@ -13,8 +13,6 @@ type Parsed = {
   _include: boolean; _photo: string | null; _season: Season[]; // 크롭된 dataURL·시즌
 };
 
-const CAT_LABEL = (c?: string | null) => (c && (CATEGORIES as Record<string, string>)[c]) || "기타";
-
 // "29,890원" 같은 문자열 → 숫자(원). 실패 시 null
 function parsePrice(s?: string | null): number | null {
   if (!s) return null;
@@ -46,7 +44,8 @@ function cropFromImage(dataUrl: string, box: Box): Promise<string> {
 }
 
 // 주문내역 스크린샷/텍스트 → AI 파싱 → 검수(사진 미리보기) → 찜 일괄 등록
-export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+export function OrderImportModal({ onClose, onDone, customCats = {} }: { onClose: () => void; onDone: () => void; customCats?: Record<string, string> }) {
+  const allCats = { ...CATEGORIES, ...customCats };
   const [images, setImages] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -109,8 +108,8 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
           if (res.ok) image_url = d.url;
         } catch {}
       }
-      // parse-orders가 category를 CATEGORIES 키로 반환 → 그대로 cat에. 없으면 accessories
-      const cat = i.category && (CATEGORIES as Record<string, string>)[i.category] ? i.category : "accessories";
+      // 검수 화면 드롭다운으로 이미 유효한 카테고리 키가 채워짐. 혹시 없으면 accessories
+      const cat = i.category && allCats[i.category] ? i.category : "accessories";
       return {
         id: `custom-${Date.now()}-${idx}`,
         cat, name: i.name,
@@ -168,7 +167,7 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
           </>
         ) : (
           <>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 10, lineHeight: 1.5 }}>{items.length}개 발견 · 넣을 것만 체크. 옷 아닌 잡화는 미리 빼놨어. 사진이 엉뚱하면 ✕로 빼고, 빈 칸을 눌러 직접 넣어도 돼. 시즌은 아이템마다 골라줘(안 골라도 됨).</div>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 10, lineHeight: 1.5 }}>{items.length}개 발견 · 넣을 것만 체크. 옷 아닌 잡화는 미리 빼놨어. 사진이 엉뚱하면 ✕로 빼고, 빈 칸을 눌러 직접 넣어도 돼. 카테고리가 틀렸으면 옆 드롭다운에서 바로 고쳐줘. 시즌은 아이템마다 골라줘(안 골라도 됨).</div>
             <input ref={itemPhotoRef} type="file" accept="image/*" onChange={addPhotoForItem} style={{ display: "none" }} />
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
               {items.map((it, i) => (
@@ -189,7 +188,9 @@ export function OrderImportModal({ onClose, onDone }: { onClose: () => void; onD
                     <input value={it.name} onChange={e => update(i, { name: e.target.value })} style={{ ...field, fontWeight: 500, marginBottom: 4 }} />
                     <div style={{ display: "flex", gap: 6 }}>
                       <input value={it.price || ""} onChange={e => update(i, { price: e.target.value })} placeholder="가격" style={{ ...field, flex: 1 }} />
-                      <span style={{ fontSize: 10, color: "#888", alignSelf: "center", flexShrink: 0 }}>{CAT_LABEL(it.category)}{it.is_clothing === false ? "·잡화" : ""}</span>
+                      <select value={it.category && allCats[it.category] ? it.category : "accessories"} onChange={e => update(i, { category: e.target.value })} style={{ ...field, flex: 1, padding: "7px 6px", cursor: "pointer" }}>
+                        {Object.entries(allCats).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
                     </div>
                     <div style={{ display: "flex", gap: 4, marginTop: 5 }}>
                       {(["spring", "summer", "fall", "winter"] as Season[]).map(s => {

@@ -509,19 +509,20 @@ JSON만 반환:
   };
 
   // 찜 = 인박스. 여기서 옷장으로 졸업시키거나 살/말 판단으로 보냄.
-  const guessCat = (note?: string): CategoryKey => {
-    if (note) for (const [k, label] of Object.entries(CATEGORIES)) if (note.includes(label)) return k as CategoryKey;
-    return "shortTees" as CategoryKey;
-  };
-  const moveWishToCloset = async (wish: WishItem) => {
+  // 카테고리·시즌은 찜 편집 모달에서 사용자가 고른 값을 받는다 (예전엔 메모만 보고 추측 → 거의 항상 반팔티로 오분류됐음)
+  const moveWishToCloset = async (wish: WishItem, cat: CategoryKey, season: Season[]) => {
+    const price = wish.price ? (parseInt(wish.price.replace(/[^0-9]/g, ""), 10) || null) : null;
     // insert 성공을 확인한 뒤에만 찜에서 삭제 (실패 시 데이터 손실 방지)
     const { error } = await supabase.from("clothing_items").insert({
-      id: `custom-${Date.now()}`, cat: guessCat(wish.note), name: wish.name,
-      image_url: wish.image_url || null, season: [], tags: [],
+      id: `custom-${Date.now()}`, cat, name: wish.name,
+      image_url: wish.image_url || null, season, tags: [],
+      price, acquired_via: "new",
     });
     if (error) { alert(`옷장 추가에 실패했어요: ${error}`); return; }
     await supabase.from("wish_items").delete().eq("id", wish.id);
     setEditingWish(null);
+    setClosetFilter("all");   // 시즌 필터에 걸려 안 보이는 일 방지
+    setExpandedCat(cat);      // 방금 넣은 카테고리를 바로 펼쳐서 찾기 쉽게
     await fetchData();
     setView("closet");
   };

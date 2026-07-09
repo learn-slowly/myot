@@ -1,22 +1,28 @@
 "use client";
 
 import { useState, useRef } from "react";
-import type { WishItem } from "@/data/closet";
+import { CATEGORIES, SEASONS, type Season, type WishItem } from "@/data/closet";
+import { guessCategory } from "@/lib/utils";
 import type { WishStatus } from "@/types";
 
-export function WishEditModal({ wish, wishStatuses, onClose, onSave, onDelete, onAddStatus, onMoveToCloset, onJudge }: {
+export function WishEditModal({ wish, wishStatuses, customCats, onClose, onSave, onDelete, onAddStatus, onMoveToCloset, onJudge }: {
   wish: WishItem;
   wishStatuses: WishStatus[];
+  customCats: Record<string, string>;
   onClose: () => void;
   onSave: (w: WishItem) => void;
   onDelete: (id: string) => void;
   onAddStatus: (label: string) => Promise<string>;
-  onMoveToCloset: (w: WishItem) => void;
+  onMoveToCloset: (w: WishItem, cat: string, season: Season[]) => void;
   onJudge: (w: WishItem) => void;
 }) {
   const [form, setForm] = useState({ ...wish });
   const [newStatusName, setNewStatusName] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [moving, setMoving] = useState(false);          // 옷장 분류 선택 패널 표시
+  const [closetCat, setClosetCat] = useState("shortTees");
+  const [closetSeason, setClosetSeason] = useState<Season[]>([]);
+  const allCats = { ...CATEGORIES, ...customCats };
   const wishImageRef = useRef<HTMLInputElement>(null);
   const fieldStyle = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid rgba(0,0,0,0.1)", fontSize: 13, fontFamily: "inherit", background: "rgba(255,255,255,0.7)", outline: "none", boxSizing: "border-box" as const };
   const labelStyle = { fontSize: 12, fontWeight: 600 as const, color: "#2A2A2A", marginBottom: 4, display: "block" };
@@ -88,16 +94,40 @@ export function WishEditModal({ wish, wishStatuses, onClose, onSave, onDelete, o
         </div>
 
         {/* 찜 = 인박스: 여기서 살/말 판단으로 보내거나 옷장으로 졸업 */}
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <button onClick={() => onJudge(form)} disabled={!form.image_url} title={form.image_url ? "" : "사진이 있어야 살/말 판단 가능"} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1.5px solid rgba(107,45,62,0.25)", background: form.image_url ? "rgba(107,45,62,0.04)" : "rgba(0,0,0,0.03)", color: form.image_url ? "#6B2D3E" : "#bbb", cursor: form.image_url ? "pointer" : "default", fontSize: 12, fontWeight: 500, fontFamily: "inherit" }}>🤔 살/말 판단</button>
-          <button onClick={() => onMoveToCloset(form)} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1.5px solid rgba(74,124,89,0.3)", background: "rgba(74,124,89,0.06)", color: "#4A7C59", cursor: "pointer", fontSize: 12, fontWeight: 500, fontFamily: "inherit" }}>📦 옷장으로 (샀어)</button>
-        </div>
+        {moving ? (
+          /* 옷장 분류 선택 — 카테고리 오분류로 한참 찾는 일 방지 */
+          <div style={{ marginTop: 16, padding: 12, borderRadius: 12, background: "rgba(74,124,89,0.06)", border: "1.5px solid rgba(74,124,89,0.25)" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#4A7C59", marginBottom: 8 }}>📦 옷장 어디에 넣을까? — 맞는지 확인해줘</div>
+            <label style={labelStyle}>카테고리</label>
+            <select value={closetCat} onChange={e => setClosetCat(e.target.value)} style={{ ...fieldStyle, marginBottom: 10, cursor: "pointer" }}>
+              {Object.entries(allCats).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+            <label style={labelStyle}>시즌 (선택)</label>
+            <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+              {(["spring", "summer", "fall", "winter"] as Season[]).map(s => {
+                const on = closetSeason.includes(s);
+                return <button key={s} type="button" onClick={() => setClosetSeason(on ? closetSeason.filter(x => x !== s) : [...closetSeason, s])} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: `1.5px solid ${on ? "#4A7C59" : "rgba(0,0,0,0.12)"}`, background: on ? "#4A7C59" : "transparent", color: on ? "#fff" : "#888", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>{SEASONS[s]}</button>;
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setMoving(false)} style={{ padding: "11px 16px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", color: "#888" }}>취소</button>
+              <button onClick={() => onMoveToCloset(form, closetCat, closetSeason)} style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: "#4A7C59", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>옷장에 추가</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <button onClick={() => onJudge(form)} disabled={!form.image_url} title={form.image_url ? "" : "사진이 있어야 살/말 판단 가능"} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1.5px solid rgba(107,45,62,0.25)", background: form.image_url ? "rgba(107,45,62,0.04)" : "rgba(0,0,0,0.03)", color: form.image_url ? "#6B2D3E" : "#bbb", cursor: form.image_url ? "pointer" : "default", fontSize: 12, fontWeight: 500, fontFamily: "inherit" }}>🤔 살/말 판단</button>
+              <button onClick={() => { setClosetCat(guessCategory(`${form.name} ${form.note || ""}`)); setClosetSeason([]); setMoving(true); }} style={{ flex: 1, padding: 11, borderRadius: 10, border: "1.5px solid rgba(74,124,89,0.3)", background: "rgba(74,124,89,0.06)", color: "#4A7C59", cursor: "pointer", fontSize: 12, fontWeight: 500, fontFamily: "inherit" }}>📦 옷장으로 (샀어)</button>
+            </div>
 
-        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <button onClick={() => onDelete(form.id)} style={{ padding: "12px 16px", borderRadius: 10, border: "1.5px solid rgba(232,93,93,0.3)", background: "transparent", color: "#E85D5D", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>삭제</button>
-          <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", color: "#888" }}>취소</button>
-          <button onClick={() => onSave(form)} style={{ flex: 2, padding: 12, borderRadius: 10, border: "none", background: "#2A2A2A", color: "#F5F0E1", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>저장</button>
-        </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button onClick={() => onDelete(form.id)} style={{ padding: "12px 16px", borderRadius: 10, border: "1.5px solid rgba(232,93,93,0.3)", background: "transparent", color: "#E85D5D", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>삭제</button>
+              <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", color: "#888" }}>취소</button>
+              <button onClick={() => onSave(form)} style={{ flex: 2, padding: 12, borderRadius: 10, border: "none", background: "#2A2A2A", color: "#F5F0E1", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>저장</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
